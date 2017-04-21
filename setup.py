@@ -14,7 +14,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 # long_description = read('README.rst')
 
 setup(name='hdpg1d',
-      version='1.0',
+      version='1.1',
       description='An 1D finite element solver using hybridizable discontinuous\
       Petrov-Galerkin method',
       author='Keyi Ni',
