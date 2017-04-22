@@ -1,5 +1,5 @@
 """
-A module for postprocessing the numerical results.
+A module for postprocessing the numerical results from HDPG1d solver.
 """
 import matplotlib.pyplot as plt
 import numpy as np
