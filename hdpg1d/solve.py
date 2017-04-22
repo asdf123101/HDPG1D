@@ -1,6 +1,6 @@
-from coefficients import coefficients
-from discretization import HDPG1d
-from postprocess import convHistory
+from .coefficients import coefficients
+from .discretization import HDPG1d
+from .postprocess import convHistory
 import sys
 
 
@@ -38,24 +38,24 @@ def getCoefficients():
     return Coeff
 
 
-menu = {}
-menu['1.'] = "Solve with HDG."
-menu['2.'] = "Solve with HDPG."
-menu['3.'] = "Exit."
+def run():
+    menu = {}
+    menu['1.'] = "Solve with HDG."
+    menu['2.'] = "Solve with HDPG."
+    menu['3.'] = "Exit."
 
-options = menu.keys()
-for entry in options:
-    print(entry, menu[entry])
+    for key, value in sorted(menu.items()):
+        print(key, value)
 
-selection = input("Please Select:")
-if selection == '1':
-    hdgCoeff = getCoefficients()
-    hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
-    trueError, estError = hdgSolution.adaptive()
-    convHistory(trueError, estError)
-elif selection == '2':
-    print("In development...")
-elif selection == '3':
-    print("Bye.")
-else:
-    print("Unknown Option Selected!")
+    selection = input("Please Select:")
+    if selection == '1':
+        hdgCoeff = getCoefficients()
+        hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
+        trueError, estError = hdgSolution.adaptive()
+        convHistory(trueError, estError)
+    elif selection == '2':
+        print("In development...")
+    elif selection == '3':
+        print("Bye.")
+    else:
+        print("Unknown Option Selected!")
