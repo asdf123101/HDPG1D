@@ -13,7 +13,7 @@
 
 This is a python package that solves 1-Dimensional PDEs using hybridizable discontinuous Petrov-Galerkin discretization, a novel FEA discretization that ensures the best solution quality without extra stablization mechanism.
 
-[Solution of Burger's equation using HDPG.](https://nicobili.ddns.net/owncloud/index.php/s/8hbfsDU3dmdzOXH)
+![Solution of Burger's equation using HDPG.](https://nicobili.ddns.net/owncloud/index.php/s/8hbfsDU3dmdzOXH)
 
 # Install<a id="sec-2" name="sec-2"></a>
 In terminal: 
