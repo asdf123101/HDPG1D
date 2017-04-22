@@ -7,7 +7,7 @@ import os
 
 
 setup(name='hdpg1d',
-      version='1.1.1',
+      version='1.2',
       description='An 1D finite element solver using hybridizable discontinuous\
       Petrov-Galerkin method',
       author='Keyi Ni',
