@@ -47,7 +47,7 @@ def run():
     for key, value in sorted(menu.items()):
         print(key, value)
 
-    selection = input("Please Select:")
+    selection = input("Please Select: ")
     if selection == '1':
         hdgCoeff = getCoefficients()
         hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
