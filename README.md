@@ -16,11 +16,13 @@ This is a python package that solves 1-Dimensional PDEs using hybridizable disco
 [Solution of Burger's equation using HDPG.](file:///home/nico/ownCloud/2016%20Fall%20Lab%20Work/HDPG/HDPG1d/HDPGburgers30.pdf)
 
 # Install<a id="sec-2" name="sec-2"></a>
-```shell
+In terminal: 
+```bash
 pip install hdpg1d
 ```
 
 # Usage<a id="sec-3" name="sec-3"></a>
-```shell
-    PGsolve
+In terminal, call:
+```bash
+PGsolve
 ```
