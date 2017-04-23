@@ -38,7 +38,7 @@ def getCoefficients():
     return Coeff
 
 
-def run():
+def menu():
     menu = {}
     menu['1.'] = "Solve with HDG."
     menu['2.'] = "Solve with HDPG."
@@ -51,8 +51,9 @@ def run():
     if selection == '1':
         hdgCoeff = getCoefficients()
         hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
-        trueError, estError = hdgSolution.adaptive()
-        convHistory(trueError, estError)
+        # solve the problem adaptively and plot convergence history
+        hdgSolution.adaptive()
+        convHistory(hdgSolution)
     elif selection == '2':
         print("In development...")
     elif selection == '3':

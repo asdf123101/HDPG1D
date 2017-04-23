@@ -2,9 +2,6 @@ import numpy as np
 from numpy import sin, cos, pi
 from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
-from matplotlib import rc
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif')
 
 
 class HDPG1d(object):
@@ -23,8 +20,9 @@ class HDPG1d(object):
 
     def __init__(self, n_ele, p):
         self.n_ele = n_ele
-        # number of the shape functions (thus porder + 1)
         self.p = p + 1
+        self.estError = []
+        self.trueError = []
 
     def bc(self, case, t=None):
         # boundary condition
@@ -329,47 +327,6 @@ class HDPG1d(object):
         plt.show(block=False)
         return U
 
-    def errorL2(self):
-        # evaluate error
-        errorL2 = 0.
-        # solve and track solving time
-        x = np.linspace(0, 1, self.n_ele + 1)
-        U, _ = self.solve_local([], x)
-        errorL2 = np.abs(U[self.p * self.n_ele - 1] - np.sqrt(self.kappa))
-        return errorL2
-
-    def conv(self):
-        p = np.arange(2, 6)
-        n_ele = 2**np.arange(1, 9)
-        legend = []
-        errorL2 = np.zeros((n_ele.size, p.size))
-        for i in range(p.size):
-            self.p = p[i]
-            for j, n in enumerate(n_ele):
-                self.n_ele = n
-                print(self.errorL2())
-                errorL2[j, i] = self.errorL2()
-                legend.append('p = {}'.format(p[i] - 1))
-        # loglog plot
-        plt.figure(3)
-        plt.loglog(n_ele, errorL2, '-o')
-        plt.legend((legend))
-        plt.xlabel('Number of nodes')
-        plt.ylabel('L2 norm(log)')
-        plt.title('Convergence rate(log)')
-        plt.grid()
-        plt.savefig('con_rate_uni.pdf', bbox_inches='tight')
-
-        # output then save the convergence rates
-        rate = np.log(errorL2[0:-1, :] /
-                      errorL2[1:errorL2.size, :]) / np.log(2)
-        for i in range(p.size):
-            print('p = {}, convergence rate = {:.4f}'.format(
-                p[i] - 1, rate[-1, i]))
-        np.savetxt('Con_rate.csv', rate, fmt='%10.4f',
-                   delimiter=',', newline='\n')
-        return n_ele, errorL2
-
     def residual(self, U, hat_U, z, hat_z, dx, index, x_c):
         n_ele = self.n_ele
 
@@ -590,32 +547,8 @@ class HDPG1d(object):
             #     plt.show()
             #     plt.clf()
             trueError[0, i] = self.n_ele
-            trueError[1, i] = U[self.n_ele * self.p - 1] - np.sqrt(self.kappa)
+            trueError[1, i] = np.abs(
+                U[self.n_ele * self.p - 1] - np.sqrt(self.kappa))
             self.p = self.p + 1
-        return trueError, estError
-
-
-# test = HDPG1d(2, 2)
-
-# _, trueError, estError = test.adaptive()
-# p = np.arange(3, 4)
-# n_ele = 2**np.arange(1, 8)
-# legend = []
-# errorL2 = np.zeros((n_ele.size, p.size))
-# for i in range(p.size):
-#     test.p = p[i]
-#     for j, n in enumerate(n_ele):
-#         test.n_ele = n
-#         print(test.errorL2())
-#         errorL2[j, i] = test.errorL2()
-
-# plt.loglog(trueError[0, 0:-1], np.abs(trueError[1, 0:-1]), '-ro')
-# plt.axis([1, 250, 1e-13, 1e-2])
-# plt.loglog(n_ele, errorL2, '-o')
-# plt.loglog(estError[0, :], estError[1, :], '--', color='#1f77b4')
-# plt.xlabel('Number of elements', fontsize=17)
-# plt.ylabel('Error', fontsize=17)
-# plt.grid()
-# plt.legend(('Adaptive', 'Uniform', 'Estimator'), loc=3, fontsize=15)
-# # plt.savefig('conv{}p{}_4_test.pdf'.format(15, test.p))
-# plt.show()
+        self.trueError = trueError
+        self.estError = estError

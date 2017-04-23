@@ -7,7 +7,7 @@ class coefficients:
         self.nele = nele
 
     @classmethod
-    def from_input(cls):
+    def fromInput(cls):
         while True:
             try:
                 print("Please provide the following coefficients.")
