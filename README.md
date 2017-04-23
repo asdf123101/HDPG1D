@@ -12,7 +12,10 @@
 # HDPG1D<a id="sec-1" name="sec-1"></a>
 
 This is a python package that solves 1-Dimensional PDEs using hybridizable discontinuous Petrov-Galerkin discretization, a novel FEA discretization that ensures the best solution quality without extra stablization mechanism. The following image shows the solution of 1D inviscid Burger's equation using HDPG discretization. Notice that the oscillations near the shock are well controlled even without any artificial stablization mechanism.
-<a href="http://imgur.com/HrWIi4s"><img src="http://i.imgur.com/HrWIi4s.png" width="50%" height="50%" title="source: imgur.com" /></a>
+
+<p align="center">
+<a href="http://imgur.com/HrWIi4s"><img align="centre" img src="http://i.imgur.com/HrWIi4s.png" width="50%" height="50%" title="source: imgur.com" /></a>
+</p>
 
 # Install<a id="sec-2" name="sec-2"></a>
 In terminal: 
