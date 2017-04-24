@@ -22,8 +22,10 @@ This is a python package that solves 1-Dimensional PDEs using hybridizable disco
 </p>
 
 # Install<a id="sec-2" name="sec-2"></a>
-In terminal: 
+In the souce directory: 
 ```bash
+python setup.py sdist
+cd dist/
 pip install hdpg1d
 ```
 

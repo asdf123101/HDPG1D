@@ -47,14 +47,16 @@ def menu():
     for key, value in sorted(menu.items()):
         print(key, value)
 
+
+def runInteractive():
+    menu()
     selection = input("Please Select: ")
     if selection == '1':
         hdgCoeff = getCoefficients()
         hdgSolution = hdpg1d(hdgCoeff.nele, hdgCoeff.porder)
         # solve the problem adaptively and plot convergence history
         hdgSolution.adaptive()
-        post = utils(hdgSolution)
-        post.convHistory()
+        utils(hdgSolution).convHistory()
     elif selection == '2':
         print("In development...")
     elif selection == '3':

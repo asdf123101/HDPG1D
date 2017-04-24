@@ -11,9 +11,9 @@ class hdpg1d(object):
     Please enter number of elements and polynomial order, i.e., HDG1d(10,2)
     """
 
-    def __init__(self, n_ele, p):
-        self.n_ele = n_ele
-        self.p = p + 1
+    def __init__(self, numEle, numPolyOrder):
+        self.numEle = numEle
+        self.numBasisFuncs = numPolyOrder + 1
         self.tau_pos = 1e-6
         self.tau_neg = 1e-6
         self.c = 0
@@ -51,7 +51,7 @@ class hdpg1d(object):
 
     def mesh(self, n_ele, index, x):
         """generate mesh"""
-        # if n_ele < 1 or n_ele > self.n_ele:
+        # if n_ele < 1 or n_ele > self.numEle:
         #   raise RuntimeError('Bad Element number')
         in_value = np.zeros(len(index))
         for i in np.arange(len(index)):
@@ -59,24 +59,22 @@ class hdpg1d(object):
 
         x_c = np.sort(np.insert(x, 0, in_value))
 
-        x_i = np.linspace(x_c[n_ele - 1], x_c[n_ele], num=self.p)
+        x_i = np.linspace(x_c[n_ele - 1], x_c[n_ele], num=self.numBasisFuncs)
         dx = x_c[n_ele] - x_c[n_ele - 1]
         return x_i, dx, x_c
 
     def exact(self, x):
         """solve the problem in an enriched space to simulate exact soltuion"""
-        self.n_ele = 1000
-        self.p = 3
-        x = np.linspace(0, 1, self.n_ele + 1)
+        self.numEle = 1000
+        self.numBasisFuncs = 3
+        x = np.linspace(0, 1, self.numEle + 1)
         self.exactSol = self.solve_local([], x)
 
     def matrix_gen(self, index, x):
-        n_ele = self.n_ele
-        # # space size
-        # dx = 1/n_ele
+        n_ele = self.numEle
 
         # order of polynomial shape functions
-        p = self.p
+        p = self.numBasisFuncs
 
         # order of gauss quadrature
         gorder = 2 * p
@@ -91,7 +89,7 @@ class hdpg1d(object):
         kappa = self.kappa
 
         # number of nodes (solution U)
-        n_ele = self.n_ele + len(index)
+        n_ele = self.numEle + len(index)
         # elemental forcing vector
         F = np.zeros(p * n_ele)
         for i in range(1, n_ele + 1):
@@ -99,17 +97,11 @@ class hdpg1d(object):
             f = dx_i / 2 * \
                 shp.dot(wi * self.forcing(x[0] + 1 / 2 * (1 + xi) * dx_i))
             F[(i - 1) * p:(i - 1) * p + p] = f
-            # elemental m (for convection only)
-            # m = dx/2*shp.dot(np.diag(wi).dot(shp.T))
-            # add boundary
         F[0] += (con + self.tau_pos) * self.bc(0)[0]
         F[-1] += (-con + self.tau_neg) * self.bc(0)[1]
 
         # elemental d
-        # d = con*(-shpx.T*np.ones((gorder,p))).T.dot(np.diag(wi).dot(shp.T))
         d = shp.dot(np.diag(wi).dot(shp.T))
-        # d[0, 0] += self.tau_pos
-        # d[-1, -1] += self.tau_neg
 
         # elemental a
         a = 1 / kappa * shp.dot(np.diag(wi).dot(shp.T))
@@ -197,24 +189,24 @@ class hdpg1d(object):
         """ solve the 1d advection equation wit local HDG"""
         d, _, E, G, H, F, L, a, b, C, R = self.matrix_gen(index, x)
         # find dx
-        dx = np.zeros(self.n_ele + len(index))
+        dx = np.zeros(self.numEle + len(index))
 
-        for i in range(1, self.n_ele + len(index) + 1):
+        for i in range(1, self.numEle + len(index) + 1):
             x_i, dx_i, x_n = self.mesh(i, index, x)
             dx[i - 1] = dx_i
 
         # assemble global D
-        bb = np.zeros((self.p, self.p))
+        bb = np.zeros((self.numBasisFuncs, self.numBasisFuncs))
         bb[0, 0] = self.tau_pos
         bb[-1, -1] = self.tau_neg
-        D = np.repeat(dx, self.p) / 2 * block_diag(*[d] * (
-            self.n_ele + len(index))) + block_diag(*[bb] * (self.n_ele + len(index)))
+        D = np.repeat(dx, self.numBasisFuncs) / 2 * block_diag(*[d] * (
+            self.numEle + len(index))) + block_diag(*[bb] * (self.numEle + len(index)))
         # assemble global A
-        A = np.repeat(dx, self.p) / 2 * block_diag(*
-                                                   [a] * (self.n_ele + len(index)))
+        A = np.repeat(dx, self.numBasisFuncs) / 2 * block_diag(*
+                                                               [a] * (self.numEle + len(index)))
 
         # assemble global B
-        B = block_diag(*[b] * (self.n_ele + len(index)))
+        B = block_diag(*[b] * (self.numEle + len(index)))
         # solve U and \lambda
         K = -np.concatenate((C.T, G), axis=1).dot(np.linalg.inv(
             np.bmat([[A, -B], [B.T, D]])).dot(np.concatenate((C, E)))) + H
@@ -226,7 +218,7 @@ class hdpg1d(object):
         return U, lamba
 
     def solve_adjoint(self, index, x, u, u_hat):
-        self.p = self.p + 1
+        self.numBasisFuncs = self.numBasisFuncs + 1
         d, _, E, G, H, F, L, a, b, C, R = self.matrix_gen(index, x)
 
         # add boundary
@@ -234,23 +226,23 @@ class hdpg1d(object):
         R[-1] = -self.bc(1)[1]
 
         # find dx
-        dx = np.zeros(self.n_ele + len(index))
-        for i in range(1, self.n_ele + len(index) + 1):
+        dx = np.zeros(self.numEle + len(index))
+        for i in range(1, self.numEle + len(index) + 1):
             x_i, dx_i, x_n = self.mesh(i, index, x)
             dx[i - 1] = dx_i
         # assemble global D
-        bb = np.zeros((self.p, self.p))
+        bb = np.zeros((self.numBasisFuncs, self.numBasisFuncs))
         bb[0, 0] = self.tau_pos
         bb[-1, -1] = self.tau_neg
-        D = np.repeat(dx, self.p) / 2 * block_diag(*[d] * (
-            self.n_ele + len(index))) + block_diag(*[bb] * (self.n_ele + len(index)))
+        D = np.repeat(dx, self.numBasisFuncs) / 2 * block_diag(*[d] * (
+            self.numEle + len(index))) + block_diag(*[bb] * (self.numEle + len(index)))
 
         # assemble global A
-        A = np.repeat(dx, self.p) / 2 * block_diag(*
-                                                   [a] * (self.n_ele + len(index)))
+        A = np.repeat(dx, self.numBasisFuncs) / 2 * block_diag(*
+                                                               [a] * (self.numEle + len(index)))
 
         # assemble global B
-        B = block_diag(*[b] * (self.n_ele + len(index)))
+        B = block_diag(*[b] * (self.numEle + len(index)))
 
         # # assemble global matrix LHS
         LHS = np.bmat([[A, -B, C], [B.T, D, E], [C.T, G, H]])
@@ -258,7 +250,7 @@ class hdpg1d(object):
         # solve U and \lambda
         U = np.linalg.solve(LHS.T, np.concatenate((R, F, L)))
 
-        return U[0:2 * self.p * (self.n_ele + len(index))], U[2 * self.p * (self.n_ele + len(index)):len(U)]
+        return U[0:2 * self.numBasisFuncs * (self.numEle + len(index))], U[2 * self.numBasisFuncs * (self.numEle + len(index)):len(U)]
 
     def diffusion(self):
         """solve 1d convection with local HDG"""
@@ -274,27 +266,29 @@ class hdpg1d(object):
         # elmental-wise)
         d = d + 1 / dt * m
         # assemble global D
-        D = block_diag(*[d] * self.n_ele)
+        D = block_diag(*[d] * self.numEle)
         # assemble global A
-        A = block_diag(*[a] * self.n_ele)
+        A = block_diag(*[a] * self.numEle)
         # assemble global B
-        B = block_diag(*[b] * self.n_ele)
+        B = block_diag(*[b] * self.numEle)
 
         # initial condition
-        X = np.zeros(self.p * self.n_ele)
-        for i in range(1, self.n_ele + 1):
+        X = np.zeros(self.numBasisFuncs * self.numEle)
+        for i in range(1, self.numEle + 1):
             x = self.mesh(i)
-            X[(i - 1) * self.p:(i - 1) * self.p + self.p] = x
+            X[(i - 1) * self.numBasisFuncs:(i - 1) *
+              self.numBasisFuncs + self.numBasisFuncs] = x
         U = np.concatenate((pi * cos(pi * X), sin(pi * X)))
 
         # assemble M
-        M = block_diag(*[1 / dt * m] * self.n_ele)
+        M = block_diag(*[1 / dt * m] * self.numEle)
 
         # time marching
         while t < T:
             # add boundary conditions
             F_dynamic = F + \
-                M.dot(U[self.n_ele * self.p:2 * self.n_ele * self.p])
+                M.dot(U[self.numEle * self.numBasisFuncs:2 *
+                        self.numEle * self.numBasisFuncs])
 
             # assemble global matrix LHS
             LHS = np.bmat([[A, -B, C], [B.T, D, E], [C.T, G, H]])
@@ -304,7 +298,8 @@ class hdpg1d(object):
 
             # plot solutions
             plt.clf()
-            plt.plot(X, U[self.n_ele * self.p:2 * self.n_ele * self.p], '-r.')
+            plt.plot(X, U[self.numEle * self.numBasisFuncs:2 *
+                          self.numEle * self.numBasisFuncs], '-r.')
             plt.plot(X, sin(pi * X) * np.exp(-pi**2 * t))
             plt.ylim([0, 1])
             plt.grid()
@@ -314,7 +309,8 @@ class hdpg1d(object):
         print("Diffusion equation du/dt - du^2/d^2x = 0 with u_exact ="
               ' 6sin(pi*x)*exp(-pi^2*t).')
         plt.figure(1)
-        plt.plot(X, U[self.n_ele * self.p:2 * self.n_ele * self.p], '-r.')
+        plt.plot(X, U[self.numEle * self.numBasisFuncs:2 *
+                      self.numEle * self.numBasisFuncs], '-r.')
         plt.plot(X, sin(pi * X) * np.exp(-pi**2 * T))
         plt.xlabel('x')
         plt.ylabel('y')
@@ -326,10 +322,10 @@ class hdpg1d(object):
         return U
 
     def residual(self, U, hat_U, z, hat_z, dx, index, x_c):
-        n_ele = self.n_ele
+        n_ele = self.numEle
 
         # order of polynomial shape functions
-        p = self.p
+        p = self.numBasisFuncs
 
         p_l = p - 1
         # order of gauss quadrature
@@ -345,25 +341,26 @@ class hdpg1d(object):
         # diffusion constant
         kappa = self.kappa
 
-        z_q, z_u, z_hat = np.zeros(self.p * self.n_ele), \
-            np.zeros(self.p * self.n_ele), np.zeros(self.n_ele - 1)
+        z_q, z_u, z_hat = np.zeros(self.numBasisFuncs * self.numEle), \
+            np.zeros(self.numBasisFuncs *
+                     self.numEle), np.zeros(self.numEle - 1)
 
-        q, u, lamba = np.zeros(p_l * self.n_ele), \
-            np.zeros(p_l * self.n_ele), np.zeros(self.n_ele - 1)
+        q, u, lamba = np.zeros(p_l * self.numEle), \
+            np.zeros(p_l * self.numEle), np.zeros(self.numEle - 1)
 
-        for i in np.arange(self.p * self.n_ele):
+        for i in np.arange(self.numBasisFuncs * self.numEle):
             z_q[i] = z[i]
-            z_u[i] = z[i + self.p * self.n_ele]
+            z_u[i] = z[i + self.numBasisFuncs * self.numEle]
 
-        for i in np.arange(p_l * self.n_ele):
+        for i in np.arange(p_l * self.numEle):
             q[i] = U[i]
-            u[i] = U[i + p_l * self.n_ele]
+            u[i] = U[i + p_l * self.numEle]
 
-        for i in np.arange(self.n_ele - 1):
+        for i in np.arange(self.numEle - 1):
             z_hat[i] = hat_z[i]
 
         # add boundary condtions to U_hat
-        U_hat = np.zeros(self.n_ele + 1)
+        U_hat = np.zeros(self.numEle + 1)
         for i, x in enumerate(hat_U):
             U_hat[i + 1] = x
         U_hat[0] = self.bc(0)[0]
@@ -440,8 +437,8 @@ class hdpg1d(object):
         L = np.zeros(n_ele - 1)
 
         # residual vector
-        R = np.zeros(self.n_ele)
-        for i in np.arange(self.n_ele):
+        R = np.zeros(self.numEle)
+        for i in np.arange(self.numEle):
             a = dx[i] / 2 * 1 / kappa * \
                 ((shp.T).T).dot(np.diag(wi).dot(shp_l.T))
 
@@ -476,23 +473,24 @@ class hdpg1d(object):
         com_index = np.argsort(np.abs(R))
         # select \theta% elements with the large error
         theta = 0.15
-        refine_index = com_index[int(self.n_ele * (1 - theta)):len(R)]
-        self.p = self.p - 1
+        refine_index = com_index[int(self.numEle * (1 - theta)):len(R)]
+        self.numBasisFuncs = self.numBasisFuncs - 1
 
         # global error
         R_g = (C.T.dot(q) + G.dot(u) + H.dot(U_hat[1:-1])).dot(1 - z_hat)
         return np.abs(np.sum(R) + np.sum(R_g)), refine_index + 1
 
     def adaptive(self):
-        x = np.linspace(0, 1, self.n_ele + 1)
+        x = np.linspace(0, 1, self.numEle + 1)
         index = []
         U, hat_U = self.solve_local(index, x)
         U_adjoint, hat_adjoint = self.solve_adjoint(index, x, U, hat_U)
-        X = np.zeros(self.p * self.n_ele)
-        dx = np.zeros(self.n_ele + len(index))
-        for i in range(1, self.n_ele + 1):
+        X = np.zeros(self.numBasisFuncs * self.numEle)
+        dx = np.zeros(self.numEle + len(index))
+        for i in range(1, self.numEle + 1):
             x_i, dx_i, x_n = self.mesh(i, index, x)
-            X[(i - 1) * self.p:(i - 1) * self.p + self.p] = x_i
+            X[(i - 1) * self.numBasisFuncs:(i - 1) *
+              self.numBasisFuncs + self.numBasisFuncs] = x_i
             dx[i - 1] = dx_i
 
         numAdaptive = 28
@@ -504,18 +502,19 @@ class hdpg1d(object):
             index = index.tolist()
             U, hat_U = self.solve_local(index, x)
             U_adjoint, hat_adjoint = self.solve_adjoint(index, x, U, hat_U)
-            self.p = self.p - 1
-            X = np.zeros(self.p * (self.n_ele + len(index)))
-            dx = np.zeros(self.n_ele + len(index))
-            for j in range(1, self.n_ele + len(index) + 1):
+            self.numBasisFuncs = self.numBasisFuncs - 1
+            X = np.zeros(self.numBasisFuncs * (self.numEle + len(index)))
+            dx = np.zeros(self.numEle + len(index))
+            for j in range(1, self.numEle + len(index) + 1):
                 x_i, dx_i, x_n = self.mesh(j, index, x)
-                X[(j - 1) * self.p:(j - 1) * self.p + self.p] = x_i
+                X[(j - 1) * self.numBasisFuncs:(j - 1) *
+                  self.numBasisFuncs + self.numBasisFuncs] = x_i
                 dx[j - 1] = dx_i
             x = x_n
-            estError[0, i] = self.n_ele
+            estError[0, i] = self.numEle
             estError[1, i] = est_error
 
-            self.n_ele = self.n_ele + len(index)
+            self.numEle = self.numEle + len(index)
 
             # U_1d = np.zeros(len(U))
             # for j in np.arange(len(U)):
@@ -523,17 +522,17 @@ class hdpg1d(object):
             # Unum = np.array([])
             # Xnum = np.array([])
             # Qnum = np.array([])
-            # for j in range(1, self.n_ele + 1):
+            # for j in range(1, self.numEle + 1):
             #     # Gauss quadrature
-            #     gorder = 10 * self.p
+            #     gorder = 10 * self.numBasisFuncs
             #     xi, wi = np.polynomial.legendre.leggauss(gorder)
-            #     shp, shpx = self.shape(xi, self.p)
-            #     Xnum = np.hstack((Xnum, (X[(j - 1) * self.p + self.p - 1] + X[(j - 1) * self.p]) / 2 + (
-            #         X[(j - 1) * self.p + self.p - 1] - X[(j - 1) * self.p]) / 2 * xi))
+            #     shp, shpx = self.shape(xi, self.numBasisFuncs)
+            #     Xnum = np.hstack((Xnum, (X[(j - 1) * self.numBasisFuncs + self.numBasisFuncs - 1] + X[(j - 1) * self.numBasisFuncs]) / 2 + (
+            #         X[(j - 1) * self.numBasisFuncs + self.numBasisFuncs - 1] - X[(j - 1) * self.numBasisFuncs]) / 2 * xi))
             #     Unum = np.hstack(
-            #         (Unum, shp.T.dot(U_1d[int(len(U) / 2) + (j - 1) * self.p:int(len(U) / 2) + j * self.p])))
+            #         (Unum, shp.T.dot(U_1d[int(len(U) / 2) + (j - 1) * self.numBasisFuncs:int(len(U) / 2) + j * self.numBasisFuncs])))
             #     Qnum = np.hstack(
-            #         (Qnum, shp.T.dot(U_1d[int((j - 1) * self.p):j * self.p])))
+            #         (Qnum, shp.T.dot(U_1d[int((j - 1) * self.numBasisFuncs):j * self.numBasisFuncs])))
             # if i in [0, 4, 9, 19]:
             #     plt.plot(Xnum, Unum, '-', color='C3')
             #     plt.plot(X, U[int(len(U) / 2):len(U)], 'C3.')
@@ -544,9 +543,9 @@ class hdpg1d(object):
             #     # plt.savefig('u_test_{}.pdf'.format(i+1))
             #     plt.show()
             #     plt.clf()
-            trueError[0, i] = self.n_ele
+            trueError[0, i] = self.numEle
             trueError[1, i] = np.abs(
-                U[self.n_ele * self.p - 1] - np.sqrt(self.kappa))
-            self.p = self.p + 1
+                U[self.numEle * self.numBasisFuncs - 1] - np.sqrt(self.kappa))
+            self.numBasisFuncs = self.numBasisFuncs + 1
         self.trueError = trueError
         self.estError = estError

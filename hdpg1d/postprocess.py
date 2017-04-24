@@ -9,17 +9,17 @@ class utils(object):
     def __init__(self, solution):
         self.solution = solution
         exactNumEle = 200
-        exactPolyOrder = 5
-        self.solution.n_ele = exactNumEle
-        self.solution.p = exactPolyOrder
+        exactBasisFuncs = 5
+        self.solution.numEle = exactNumEle
+        self.solution.numBasisFuncs = exactBasisFuncs
         x = np.linspace(0, 1, exactNumEle + 1)
         self.exactSol = self.solution.solve_local(
-            [], x)[0].A1[exactNumEle * exactPolyOrder - 1]
+            [], x)[0].A1[exactNumEle * exactBasisFuncs - 1]
 
     def errorL2(self):
         errorL2 = 0.
-        n_ele = self.solution.n_ele
-        p = self.solution.p
+        n_ele = self.solution.numEle
+        p = self.solution.numBasisFuncs
         # solve the uniform case
         x = np.linspace(0, 1, n_ele + 1)
         U, _ = self.solution.solve_local([], x)
@@ -27,15 +27,15 @@ class utils(object):
         return errorL2
 
     def uniConv(self):
-        p = np.arange(2, 3)
-        n_ele = 2**np.arange(1, 9)
-        uniError = np.zeros((n_ele.size, p.size))
-        for i in range(p.size):
-            self.solution.p = p[i]
-            for j, n in enumerate(n_ele):
-                self.solution.n_ele = n
+        numBasisFuncs = np.arange(2, 3)
+        numEle = 2**np.arange(1, 9)
+        uniError = np.zeros((numEle.size, numBasisFuncs.size))
+        for i in range(numBasisFuncs.size):
+            self.solution.numBasisFuncs = numBasisFuncs[i]
+            for j, n in enumerate(numEle):
+                self.solution.numEle = n
                 uniError[j, i] = self.errorL2()
-        return n_ele, uniError
+        return numEle, uniError
 
     def convHistory(self):
         trueError = self.solution.trueError
@@ -43,8 +43,8 @@ class utils(object):
         plt.loglog(trueError[0, 0:-1],
                    trueError[1, 0:-1], '-ro')
         # plt.axis([1, 250, 1e-13, 1e-2])
-        n_ele, errorL2 = self.uniConv()
-        plt.loglog(n_ele, errorL2, '-o')
+        numEle, errorL2 = self.uniConv()
+        plt.loglog(numEle, errorL2, '-o')
         plt.loglog(estError[0, :],
                    estError[1, :], '--', color='#1f77b4')
         plt.xlabel('Number of elements', fontsize=17)
