@@ -4,23 +4,20 @@ from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
 
 
-class HDPG1d(object):
+class hdpg1d(object):
     """
     1d advection hdg solver outlined in 'an implicit HHDG method for
     confusion'. Test case: /tau = 1, convection only, linear and higher order.
     Please enter number of elements and polynomial order, i.e., HDG1d(10,2)
     """
-    # stablization parameter
-    tau_pos = 1e-6
-    tau_neg = 1e-6
-    # advection constant
-    c = 0
-    # diffusion constant
-    kappa = 1e-6
 
     def __init__(self, n_ele, p):
         self.n_ele = n_ele
         self.p = p + 1
+        self.tau_pos = 1e-6
+        self.tau_neg = 1e-6
+        self.c = 0
+        self.kappa = 1e-6
         self.estError = []
         self.trueError = []
 
@@ -66,11 +63,12 @@ class HDPG1d(object):
         dx = x_c[n_ele] - x_c[n_ele - 1]
         return x_i, dx, x_c
 
-    def uexact(self, x):
-        # Ue = self.bc(0) + np.sin(2*pi*x)
-        Ue = (np.exp(1 / self.kappa * (x - 1)) - 1) / \
-            (np.exp(-1 / self.kappa) - 1)
-        return Ue
+    def exact(self, x):
+        """solve the problem in an enriched space to simulate exact soltuion"""
+        self.n_ele = 1000
+        self.p = 3
+        x = np.linspace(0, 1, self.n_ele + 1)
+        self.exactSol = self.solve_local([], x)
 
     def matrix_gen(self, index, x):
         n_ele = self.n_ele

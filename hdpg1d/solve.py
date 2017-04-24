@@ -1,6 +1,6 @@
 from .coefficients import coefficients
-from .discretization import HDPG1d
-from .postprocess import convHistory
+from .discretization import hdpg1d
+from .postprocess import utils
 import sys
 
 
@@ -50,10 +50,11 @@ def menu():
     selection = input("Please Select: ")
     if selection == '1':
         hdgCoeff = getCoefficients()
-        hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
+        hdgSolution = hdpg1d(hdgCoeff.nele, hdgCoeff.porder)
         # solve the problem adaptively and plot convergence history
         hdgSolution.adaptive()
-        convHistory(hdgSolution)
+        post = utils(hdgSolution)
+        post.convHistory()
     elif selection == '2':
         print("In development...")
     elif selection == '3':
