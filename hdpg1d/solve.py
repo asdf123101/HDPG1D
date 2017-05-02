@@ -1,5 +1,5 @@
 from .coefficients import coefficients
-from .discretization import hdpg1d
+from .adaptation import hdpg1d
 from .postprocess import utils
 import sys
 
@@ -32,7 +32,7 @@ def getCoefficients():
     question = 'Do you want to use the default parameters?'
     isDefault = queryYesNo(question, "yes")
     if (isDefault):
-        Coeff = coefficients(1, 1, 0, 2, 2)
+        Coeff = coefficients(1e-6, 0, 0, 2, 2, 1e-6, 1e-6)
     else:
         Coeff = coefficients.from_input()
     return Coeff
@@ -48,15 +48,19 @@ def menu():
         print(key, value)
 
 
+def hdgSolve():
+    hdgCoeff = getCoefficients()
+    hdgSolution = hdpg1d(hdgCoeff)
+    # solve the problem adaptively and plot convergence history
+    hdgSolution.adaptive()
+    utils(hdgSolution).convHistory()
+
+
 def runInteractive():
     menu()
     selection = input("Please Select: ")
     if selection == '1':
-        hdgCoeff = getCoefficients()
-        hdgSolution = hdpg1d(hdgCoeff.nele, hdgCoeff.porder)
-        # solve the problem adaptively and plot convergence history
-        hdgSolution.adaptive()
-        utils(hdgSolution).convHistory()
+        hdgSolve()
     elif selection == '2':
         print("In development...")
     elif selection == '3':

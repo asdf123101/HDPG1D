@@ -1,10 +1,12 @@
 class coefficients:
-    def __init__(self, diff, conv, flux, porder, nele):
+    def __init__(self, diff, conv, flux, pOrder, numEle, tauPlus, tauMinus):
         self.diffusion = diff
-        self.covection = conv
+        self.convection = conv
         self.flux = flux
-        self.porder = porder
-        self.nele = nele
+        self.pOrder = pOrder
+        self.numEle = numEle
+        self.tauPlus = tauPlus
+        self.tauMinus = tauMinus
 
     @classmethod
     def fromInput(cls):
@@ -14,11 +16,13 @@ class coefficients:
                 diff = float(input("Diffusion coefficient: "))
                 conv = float(input("Covection coefficient: "))
                 flux = float(input("Flux: "))
-                porder = int(input("Order of polynomials: "))
-                nele = int(input("Number of elements: "))
+                pOrder = int(input("Order of polynomials: "))
+                numEle = int(input("Number of elements: "))
+                tauPlus = float(input("Stablization parameter plus: "))
+                tauMinus = float(input("Stablization parameter minus: "))
             except ValueError:
                 print("Sorry, wrong data type.")
                 continue
             else:
                 break
-        return cls(diff, conv, flux, porder, nele)
+        return cls(diff, conv, flux, pOrder, numEle, tauPlus, tauMinus)
