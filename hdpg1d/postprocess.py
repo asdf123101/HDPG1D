@@ -8,14 +8,15 @@ import numpy as np
 class utils(object):
     def __init__(self, solution):
         self.solution = solution
-        exactNumEle = 200
+        exactNumEle = 500
         exactBasisFuncs = 5
         self.solution.coeff.numEle = exactNumEle
         self.solution.coeff.pOrder = exactBasisFuncs - 1
         self.solution.mesh = np.linspace(0, 1, exactNumEle + 1)
-        # approximate the exact solution
-        self.exactSol = self.solution.solveLocal(
-        )[0][exactNumEle * exactBasisFuncs - 1]
+        # approximate the exact solution for general problems
+        # self.exactSol = self.solution.solveLocal()[0][exactNumEle * exactBasisFuncs - 1]
+        # for the reaction diffusion test problem, we know the exact solution
+        self.exactSol = np.sqrt(self.solution.kappa)
 
     def errorL2(self):
         errorL2 = 0.
@@ -28,7 +29,8 @@ class utils(object):
         return errorL2
 
     def uniConv(self):
-        numBasisFuncs = np.arange(2, 3)
+        numBasisFuncs = np.arange(
+            self.solution.numBasisFuncs, self.solution.numBasisFuncs + 1)
         numEle = 2**np.arange(1, 9)
         uniError = np.zeros((numEle.size, numBasisFuncs.size))
         for i in range(numBasisFuncs.size):
@@ -42,6 +44,7 @@ class utils(object):
         """Plot the uniform and adaptive convergence history"""
         plt.figure(2)
         trueErrorList = self.solution.trueErrorList
+        trueErrorList[1] = np.abs(trueErrorList[1] - self.exactSol)
         estErrorList = self.solution.estErrorList
         plt.loglog(trueErrorList[0],
                    trueErrorList[1], '-ro')

@@ -70,9 +70,9 @@ class hdpg1d(object):
         plt.plot(self.mesh, uNode, 'C3.')
         plt.xlabel('$x$', fontsize=17)
         plt.ylabel('$u$', fontsize=17)
-        plt.axis([-0.05, 1.05, 0, 1.3])
+        # plt.axis([-0.05, 1.05, 0, 1.3])
         plt.grid()
-        plt.pause(1e-1)
+        plt.pause(5e-1)
         plt.clf()
 
     def meshAdapt(self, index):
@@ -146,7 +146,6 @@ class hdpg1d(object):
 
         # diffusion constant
         kappa = self.kappa
-
         z_q, z_u, z_hat = np.zeros(p * numEle), \
             np.zeros(p *
                      numEle), np.zeros(numEle - 1)
@@ -286,13 +285,15 @@ class hdpg1d(object):
         return np.abs(np.sum(R) + np.sum(R_g)), refine_index + 1
 
     def adaptive(self):
-        tol = 1e-12
+        tol = 1e-10
         estError = 10
         counter = 0
-        ceilCounter = 100
+        ceilCounter = 50
         trueErrorList = [[], []]
         estErrorList = [[], []]
-        while estError > tol or counter > ceilCounter:
+        while estError > tol and counter < ceilCounter:
+            print("Iteration {}. Target function error {:.3e}.".format(
+                counter, estError))
             # solve
             u, uFace = self.solveLocal()
             adjoint, adjointFace = self.solveAdjoint()
@@ -302,8 +303,7 @@ class hdpg1d(object):
                 self.plotU(counter)
             # record error
             trueErrorList[0].append(self.numEle)
-            trueErrorList[1].append(np.abs(
-                u[self.numEle * self.numBasisFuncs - 1] - np.sqrt(self.kappa)))
+            trueErrorList[1].append(u[self.numEle * self.numBasisFuncs - 1])
             estError, index = self.residual(u, uFace, adjoint, adjointFace)
             estErrorList[0].append(self.numEle)
             estErrorList[1].append(estError)
