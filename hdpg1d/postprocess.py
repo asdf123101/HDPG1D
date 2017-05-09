@@ -41,14 +41,14 @@ class utils(object):
     def convHistory(self):
         """Plot the uniform and adaptive convergence history"""
         plt.figure(2)
-        trueError = self.solution.trueError
-        estError = self.solution.estError
-        plt.loglog(trueError[0],
-                   trueError[1], '-ro')
+        trueErrorList = self.solution.trueErrorList
+        estErrorList = self.solution.estErrorList
+        plt.loglog(trueErrorList[0],
+                   trueErrorList[1], '-ro')
         numEle, errorL2 = self.uniConv()
         plt.loglog(numEle, errorL2, '-o')
-        plt.loglog(estError[0],
-                   estError[1], '--', color='#1f77b4')
+        plt.loglog(estErrorList[0],
+                   estErrorList[1], '--', color='#1f77b4')
         plt.xlabel('Number of elements', fontsize=17)
         plt.ylabel('Error', fontsize=17)
         plt.grid()

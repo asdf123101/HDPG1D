@@ -34,7 +34,7 @@ def getCoefficients():
     if (isDefault):
         Coeff = coefficients(1e-6, 0, 0, 2, 2, 1e-6, 1e-6)
     else:
-        Coeff = coefficients.from_input()
+        Coeff = coefficients.fromInput()
     return Coeff
 
 
@@ -50,9 +50,11 @@ def menu():
 
 def hdgSolve():
     hdgCoeff = getCoefficients()
+    print("Solving...")
     hdgSolution = hdpg1d(hdgCoeff)
     # solve the problem adaptively and plot convergence history
     hdgSolution.adaptive()
+    print("Problem solved. Please check the convergence plot.")
     utils(hdgSolution).convHistory()
 
 

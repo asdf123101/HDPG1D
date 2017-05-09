@@ -1,10 +1,14 @@
 import numpy as np
+from numpy import concatenate as cat
 import matplotlib.pyplot as plt
+import warnings
 from matplotlib import rc
 from .preprocess import shape, discretization
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
+# supress the deprecation warning
+warnings.filterwarnings("ignore", ".*GUI is implemented.*")
 
 
 class hdpg1d(object):
@@ -22,8 +26,8 @@ class hdpg1d(object):
         self.kappa = coeff.diffusion
         self.coeff = coeff
         self.u = []
-        self.estError = []
-        self.trueError = []
+        self.estErrorList = []
+        self.trueErrorList = []
 
     def bc(self, case, t=None):
         # boundary condition
@@ -62,39 +66,43 @@ class hdpg1d(object):
             uNode[j - 1] = u[(j - 1) * self.numBasisFuncs]
         uNode[-1] = u[-1]
         plt.figure(1)
-        if counter in [0, 4, 9, 19]:
-            plt.plot(xSmooth, uSmooth, '-', color='C3')
-            plt.plot(self.mesh, uNode, 'C3.')
-            plt.xlabel('$x$', fontsize=17)
-            plt.ylabel('$u$', fontsize=17)
-            plt.axis([-0.05, 1.05, 0, 1.3])
-            plt.grid()
-            # plt.savefig('u_test_{}.pdf'.format(i+1))
-            # plt.show()
-            plt.draw()
-            plt.pause(1e-1)
-            plt.clf()
+        plt.plot(xSmooth, uSmooth, '-', color='C3')
+        plt.plot(self.mesh, uNode, 'C3.')
+        plt.xlabel('$x$', fontsize=17)
+        plt.ylabel('$u$', fontsize=17)
+        plt.axis([-0.05, 1.05, 0, 1.3])
+        plt.grid()
+        plt.pause(1e-1)
+        plt.clf()
 
     def meshAdapt(self, index):
         """Given the index list, adapt the mesh"""
-        in_value = np.zeros(len(index))
+        inValue = np.zeros(len(index))
         for i in np.arange(len(index)):
-            in_value[i] = (self.mesh[index[i]] +
-                           self.mesh[index[i] - 1]) / 2
-
-        self.mesh = np.sort(np.insert(self.mesh, 0, in_value))
+            inValue[i] = (self.mesh[index[i]] +
+                          self.mesh[index[i] - 1]) / 2
+        self.mesh = np.sort(np.insert(self.mesh, 0, inValue))
 
     def solveLocal(self):
         """Solve the primal problem"""
-        A, B, C, D, E, F, G, H, L, R, m = discretization(self.coeff, self.mesh)
+        if 'matLocal' in locals():
+            # if matLocal exists,
+            # only change the mesh instead of initialize again
+            matLocal.mesh = self.mesh
+        else:
+            matLocal = discretization(self.coeff, self.mesh)
+        matLocal.matGen()
         # solve
-        K = -np.concatenate((C.T, G), axis=1).dot(np.linalg.inv(
-            np.bmat([[A, -B], [B.T, D]])).dot(np.concatenate((C, E)))) + H
-        F_hat = np.array([L]).T - np.concatenate((C.T, G), axis=1).dot(np.linalg.inv(
-            np.bmat([[A, -B], [B.T, D]]))).dot(np.array([np.concatenate((R, F))]).T)
+        K = -cat((matLocal.C.T, matLocal.G), axis=1)\
+            .dot(np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]]))
+                 .dot(cat((matLocal.C, matLocal.E)))) + matLocal.H
+        F_hat = np.array([matLocal.L]).T - cat((matLocal.C.T, matLocal.G), axis=1)\
+            .dot(np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]])))\
+            .dot(np.array([cat((matLocal.R, matLocal.F))]).T)
         uFace = np.linalg.solve(K, F_hat)
-        u = np.linalg.inv(np.bmat([[A, -B], [B.T, D]])).dot(
-            np.array([np.concatenate((R, F))]).T - np.concatenate((C, E)).dot(uFace))
+        u = np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]]))\
+            .dot(np.array([np.concatenate((matLocal.R, matLocal.F))]).T -
+                 cat((matLocal.C, matLocal.E)).dot(uFace))
         # self.u = u.A1
         return u.A1, uFace.A1
 
@@ -102,18 +110,24 @@ class hdpg1d(object):
         """Solve the adjoint problem"""
         # solve in the enriched space
         self.coeff.pOrder += 1
-        A, B, C, D, E, F, G, H, L, R, m = discretization(
-            self.coeff, self.mesh)
+        if 'matAdjoint' in locals():
+            matAdjoint.mesh = self.mesh
+        else:
+            matAdjoint = discretization(self.coeff, self.mesh)
+        matAdjoint.matGen()
         self.coeff.pOrder = self.coeff.pOrder - 1
         # add adjoint LHS conditions
-        F = np.zeros(len(F))
-        R[-1] = -self.bc(1)[1]
+        matAdjoint.F = np.zeros(len(matAdjoint.F))
+        matAdjoint.R[-1] = -self.bc(1)[1]
 
         # assemble global matrix LHS
-        LHS = np.bmat([[A, -B, C], [B.T, D, E], [C.T, G, H]])
+        LHS = np.bmat([[matAdjoint.A, -matAdjoint.B, matAdjoint.C],
+                       [matAdjoint.B.T, matAdjoint.D, matAdjoint.E],
+                       [matAdjoint.C.T, matAdjoint.G, matAdjoint.H]])
         # solve
-        U = np.linalg.solve(LHS.T, np.concatenate((R, F, L)))
-        return U[0:2 * len(C)], U[len(C):len(U)]
+        U = np.linalg.solve(LHS.T, np.concatenate(
+            (matAdjoint.R, matAdjoint.F, matAdjoint.L)))
+        return U[0:2 * len(matAdjoint.C)], U[len(matAdjoint.C):len(U)]
 
     def residual(self, U, hat_U, z, hat_z):
         numEle = self.numEle
@@ -273,29 +287,31 @@ class hdpg1d(object):
 
     def adaptive(self):
         tol = 1e-12
-        est_error = 10
+        estError = 10
         counter = 0
         ceilCounter = 100
-        trueError = [[], []]
-        estError = [[], []]
-        while est_error > tol or counter > ceilCounter:
+        trueErrorList = [[], []]
+        estErrorList = [[], []]
+        while estError > tol or counter > ceilCounter:
             # solve
             u, uFace = self.solveLocal()
             adjoint, adjointFace = self.solveAdjoint()
             self.u = u
-            self.plotU(counter)
-            trueError[0].append(self.numEle)
-            trueError[1].append(np.abs(
+            # plot the solution at certain counter
+            if counter in [0, 4, 9, 19]:
+                self.plotU(counter)
+            # record error
+            trueErrorList[0].append(self.numEle)
+            trueErrorList[1].append(np.abs(
                 u[self.numEle * self.numBasisFuncs - 1] - np.sqrt(self.kappa)))
-            est_error, index = self.residual(
-                u, uFace, adjoint, adjointFace)
-            estError[0].append(self.numEle)
-            estError[1].append(est_error)
+            estError, index = self.residual(u, uFace, adjoint, adjointFace)
+            estErrorList[0].append(self.numEle)
+            estErrorList[1].append(estError)
             # adapt
             index = index.tolist()
             self.meshAdapt(index)
             self.numEle = self.numEle + len(index)
             counter += 1
         # save error
-        self.trueError = trueError
-        self.estError = estError
+        self.trueErrorList = trueErrorList
+        self.estErrorList = estErrorList
