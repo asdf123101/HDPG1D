@@ -2,7 +2,7 @@ import numpy as np
 from numpy import concatenate as cat
 import matplotlib.pyplot as plt
 import warnings
-from .preprocess import shape, discretization
+from .preprocess import shape, discretization, boundaryCondition
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -27,24 +27,6 @@ class hdpg1d(object):
         self.u = []
         self.estErrorList = [[], []]
         self.trueErrorList = [[], []]
-
-    def bc(self, case, t=None):
-        # boundary condition
-        if case == 0:
-            # advection-diffusion
-            bc = [0, 0]
-        if case == 1:
-            # simple convection
-            # bc = np.sin(2*np.pi*t)
-            # adjoint boundary
-            bc = [0, 1]
-        return bc
-
-    def forcing(self, x):
-        # f = np.cos(2*np.pi*x)
-        # f = 4*pi**2*sin(2*pi*x)
-        f = 1
-        return f
 
     def plotU(self, counter):
         """Plot solution u with smooth higher oredr quadrature"""
@@ -90,9 +72,8 @@ class hdpg1d(object):
             matLocal.mesh = self.mesh
         else:
             matLocal = discretization(self.coeff, self.mesh)
-        F, L, R = matLocal.lhsGen()
-        A, B, D = matLocal.eleGen()
-        C, E, G, H = matLocal.interfaceGen()
+        matGroup = matLocal.matGroup()
+        A, B, _, C, D, E, F, G, H, L, R = matGroup
         # solve
         K = -cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))
@@ -104,7 +85,6 @@ class hdpg1d(object):
         u = np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))\
             .dot(np.array([np.concatenate((R, F))]).T -
                  cat((C, E)).dot(uFace))
-        # self.u = u.A1
         return u.A1, uFace.A1
 
     def solveAdjoint(self):
@@ -116,182 +96,51 @@ class hdpg1d(object):
         else:
             matAdjoint = discretization(self.coeff, self.mesh)
         self.coeff.pOrder = self.coeff.pOrder - 1
-        F, L, R = matAdjoint.lhsGen()
-        A, B, D = matAdjoint.eleGen()
-        C, E, G, H = matAdjoint.interfaceGen()
+        matGroup = matAdjoint.matGroup()
+        A, B, _, C, D, E, F, G, H, L, R = matGroup
         # add adjoint LHS conditions
         F = np.zeros(len(F))
-        R[-1] = -self.bc(1)[1]
+        R[-1] = -boundaryCondition(1)[1]
 
         # assemble global matrix LHS
         LHS = np.bmat([[A, -B, C],
                        [B.T, D, E],
                        [C.T, G, H]])
         # solve
-        U = np.linalg.solve(LHS.T, np.concatenate(
-            (R, F, L)))
+        U = np.linalg.solve(LHS.T, cat((R, F, L)))
         return U[0:2 * len(C)], U[len(C):len(U)]
 
     def residual(self, U, hat_U, z, hat_z):
+        enrich = 1
         if 'matResidual' in locals():
-            # if matLocal exists,
-            # only change the mesh instead of initializing again
             matResidual.mesh = self.mesh
         else:
-            matResidual = discretization(self.coeff, self.mesh, 1)
-        F, L, R = matResidual.lhsGen()
-        # A, B, D = matResidual.eleGen()
-        # C, E, G, H = matResidual.interfaceGen()
-
-        numEle = self.numEle
-        p = self.numBasisFuncs + 1
-
-        p_l = p - 1
-        # order of gauss quadrature
-        gorder = 2 * p
-        # shape function and gauss quadrature
-        xi, wi = np.polynomial.legendre.leggauss(gorder)
-        shp, shpx = shape(xi, p)
-        shp_l, shpx_l = shape(xi, p_l)
-        # ---------------------------------------------------------------------
-        # advection constant
-        con = self.c
-
-        # diffusion constant
-        kappa = self.kappa
-        z_q, z_u, z_hat = np.zeros(p * numEle), \
-            np.zeros(p *
-                     numEle), np.zeros(numEle - 1)
-
-        q, u, lamba = np.zeros(p_l * numEle), \
-            np.zeros(p_l * numEle), np.zeros(numEle - 1)
-        for i in np.arange(p * numEle):
-            z_q[i] = z[i]
-            z_u[i] = z[i + p * numEle]
-
-        for i in np.arange(p_l * numEle):
-            q[i] = U[i]
-            u[i] = U[i + p_l * numEle]
-
-        for i in np.arange(numEle - 1):
-            z_hat[i] = hat_z[i]
-
-        # add boundary condtions to U_hat
-        U_hat = np.zeros(numEle + 1)
-        for i, x in enumerate(hat_U):
-            U_hat[i + 1] = x
-        U_hat[0] = self.bc(0)[0]
-        U_hat[-1] = self.bc(0)[1]
-
-        # L, easy in 1d
-        # L = np.zeros(numEle + 1)
-
-        # R, easy in 1d
-        RR = np.zeros(p * numEle)
-
-        # elemental forcing vector
-        dist = np.zeros(numEle)
-        for i in range(1, numEle + 1):
-            dist[i - 1] = self.mesh[i] - self.mesh[i - 1]
-
-        # elemental h
-        h = np.zeros((2, 2))
-        h[0, 0], h[-1, -1] = -con - self.tau_pos, con - self.tau_neg
-        # mappinng matrix
-        map_h = np.zeros((2, numEle), dtype=int)
-        map_h[:, 0] = np.arange(2)
-        for i in np.arange(1, numEle):
-            map_h[:, i] = np.arange(
-                map_h[2 - 1, i - 1], map_h[2 - 1, i - 1] + 2)
-        # assemble H and eliminate boundaries
-        H = np.zeros((numEle + 1, numEle + 1))
-        for i in range(numEle):
-            for j in range(2):
-                m = map_h[j, i]
-                for k in range(2):
-                    n = map_h[k, i]
-                    H[m, n] += h[j, k]
-        H = H[1:numEle][:, 1:numEle]
-
-        # elemental g
-        g = np.zeros((2, p_l))
-        g[0, 0], g[-1, -1] = self.tau_pos, self.tau_neg
-        # mapping matrix
-        map_g_x = map_h
-        map_g_y = np.arange(p_l * numEle, dtype=int).reshape(numEle, p_l).T
-        # assemble global G
-        G = np.zeros((numEle + 1, p_l * numEle))
-        for i in range(numEle):
-            for j in range(2):
-                m = map_g_x[j, i]
-                for k in range(p_l):
-                    n = map_g_y[k, i]
-                    G[m, n] += g[j, k]
-        G = G[1:numEle, :]
-
-        # elemental c
-        c = np.zeros((p_l, 2))
-        c[0, 0], c[-1, -1] = -1, 1
-
-        # mapping matrix
-        map_e_x = np.arange(p_l * numEle, dtype=int).reshape(numEle, p_l).T
-        map_e_y = map_h
-
-        # assemble global C
-        C = np.zeros((p_l * numEle, numEle + 1))
-        for i in range(numEle):
-            for j in range(p_l):
-                m = map_e_x[j, i]
-                for k in range(2):
-                    n = map_e_y[k, i]
-                    C[m, n] += c[j, k]
-        C = C[:, 1:numEle]
-
-        # L, easy in 1d
-        # L = np.zeros(numEle - 1)
-
-        # residual vector
-        Residual = np.zeros(self.numEle)
+            matResidual = discretization(self.coeff, self.mesh, enrich)
+        matGroup = matResidual.matGroup()
+        A, B, BonU, C, D, E, F, G, H, L, R = matGroup
+        LHS = np.bmat([[A, -B, C],
+                       [BonU, D, E]])
+        RHS = cat((R, F))
+        residual = np.zeros(self.numEle)
+        numEnrich = self.numBasisFuncs + enrich
         for i in np.arange(self.numEle):
-            a = dist[i] / 2 * 1 / kappa * \
-                ((shp.T).T).dot(np.diag(wi).dot(shp_l.T))
-
-            b = ((shpx.T) * np.ones((gorder, p))
-                 ).T.dot(np.diag(wi).dot(shp_l.T))
-
-            b_t = ((shpx_l.T) * np.ones((gorder, p_l))
-                   ).T.dot(np.diag(wi).dot(shp.T))
-
-            d = dist[i] / 2 * shp.dot(np.diag(wi).dot(shp_l.T))
-            d[0, 0] += self.tau_pos
-            d[-1, -1] += self.tau_neg
-
-            h = np.zeros((2, 2))
-            h[0, 0], h[-1, -1] = -con - self.tau_pos, con - self.tau_neg
-
-            g = np.zeros((2, p_l))
-            g[0, 0], g[-1, -1] = self.tau_pos, self.tau_neg
-
-            e = np.zeros((p, 2))
-            e[0, 0], e[-1, -1] = -con - self.tau_pos, con - self.tau_neg
-
-            c = np.zeros((p, 2))
-            c[0, 0], c[-1, -1] = -1, 1
-
-            m = np.zeros((2, p_l))
-            m[0, 0], m[-1, -1] = -1, 1
-            # local error
-            Residual[i] = (np.concatenate((a.dot(q[p_l * i:p_l * i + p_l]) + -b.dot(u[p_l * i:p_l * i + p_l]) + c.dot(U_hat[i:i + 2]),
-                                           b_t.T.dot(q[p_l * i:p_l * i + p_l]) + d.dot(u[p_l * i:p_l * i + p_l]) + e.dot(U_hat[i:i + 2]))) - np.concatenate((R[p * i:p * i + p], F[p * i:p * i + p]))).dot(1 - np.concatenate((z_q[p * i:p * i + p], z_u[p * i:p * i + p])))
-
-        com_index = np.argsort(np.abs(Residual))
+            primalResidual = (LHS.dot(cat((U, hat_U))) - RHS).A1
+            uLength = self.numEle * numEnrich
+            stepLength = i * numEnrich
+            uDWR = primalResidual[stepLength:stepLength + numEnrich].dot(
+                (1 - z)[stepLength:stepLength + numEnrich])
+            qDWR = primalResidual[uLength + stepLength:uLength +
+                                  stepLength + numEnrich]\
+                .dot((1 - z)[uLength + stepLength:uLength +
+                             stepLength + numEnrich])
+            residual[i] = uDWR + qDWR
+        # sort residual index
+        com_index = np.argsort(np.abs(residual))
         # select \theta% elements with the large error
         theta = 0.15
-        refine_index = com_index[int(self.numEle * (1 - theta)):len(Residual)]
-
-        # global error
-        R_g = (C.T.dot(q) + G.dot(u) + H.dot(U_hat[1:-1])).dot(1 - z_hat)
-        return np.abs(np.sum(Residual) + np.sum(R_g)), refine_index + 1
+        refine_index = com_index[
+            int(self.numEle * (1 - theta)):len(residual)] + 1
+        return np.abs(np.sum(residual)), refine_index
 
     def adaptive(self):
         tol = 1e-10

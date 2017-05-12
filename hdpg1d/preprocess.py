@@ -1,4 +1,5 @@
 import numpy as np
+from collections import namedtuple
 from scipy.linalg import block_diag
 
 
@@ -18,15 +19,13 @@ def forcing(x):
     return f
 
 
-def bc(case, t=None):
+def boundaryCondition(case, t=None):
     # boundary condition
     if case == 0:
-        # advection-diffusion
+        # primal problem
         bc = [0, 0]
     if case == 1:
-        # simple convection
-        # bc = np.sin(2*np.pi*t)
-        # adjoint boundary
+        # adjoint problem
         bc = [0, 1]
     return bc
 
@@ -61,9 +60,22 @@ class discretization(object):
             dist[i - 1] = self.mesh[i] - self.mesh[i - 1]
         return dist
 
+    def matGroup(self):
+        lhsMat = self.lhsGen()
+        F, L, R = lhsMat.F, lhsMat.L, lhsMat.R
+        eleMat = self.eleGen()
+        A, B, BonU, D = eleMat.A, eleMat.B, eleMat.BonU, eleMat.D
+        faceMat = self.interfaceGen()
+        C, E, G, H = faceMat.C, faceMat.E, faceMat.G, faceMat.H
+        matGroup = namedtuple(
+            'matGroup', ['A', 'B', 'BonU', 'C', 'D', 'E', 'F', 'G', 'H', 'L', 'R'])
+        return matGroup(A, B, BonU, C, D, E, F, G, H, L, R)
+
     def lhsGen(self):
         """Generate matrices associated with left hand side"""
         if self.enrich is not None:
+            # when enrich is given
+            # provide matrices used in the DWR residual calculation
             numBasisFuncs = self.numBasisFuncs + self.enrich
             shp = self.shpEnrich
         else:
@@ -77,36 +89,57 @@ class discretization(object):
                                             1 / 2 * (1 + self.xi) *
                                             self.dist[i - 1]))
             F[(i - 1) * numBasisFuncs:i * numBasisFuncs] = f
-        F[0] += (self.conv + self.tau_pos) * bc(0)[0]
-        F[-1] += (-self.conv + self.tau_neg) * bc(0)[1]
+        F[0] += (self.conv + self.tau_pos) * boundaryCondition(0)[0]
+        F[-1] += (-self.conv + self.tau_neg) * boundaryCondition(0)[1]
         # L, easy in 1d
         L = np.zeros(self.n_ele - 1)
         # R, easy in 1d
         R = np.zeros(numBasisFuncs * self.n_ele)
-        R[0] = bc(0)[0]
-        R[-1] = -bc(0)[1]
-        return F, L, R
+        R[0] = boundaryCondition(0)[0]
+        R[-1] = -boundaryCondition(0)[1]
+        lhsMat = namedtuple('lhsMat', ['F', 'L', 'R'])
+        return lhsMat(F, L, R)
 
     def eleGen(self):
         """Generate matrices associated with elements"""
-        a = 1 / self.kappa * self.shp.dot(np.diag(self.wi).dot(self.shp.T))
+        if self.enrich is not None:
+            numBasisFuncsEnrich = self.numBasisFuncs + self.enrich
+            shpEnrich = self.shpEnrich
+            shpxEnrich = self.shpxEnrich
+            b = (self.shpx.T * np.ones((self.gqOrder, self.numBasisFuncs))
+                 ).T.dot(np.diag(self.wi).dot(shpEnrich.T))
+            # BonU is only used in calculating DWR residual
+            BonU = block_diag(*[b] * (self.n_ele)).T
+        else:
+            numBasisFuncsEnrich = self.numBasisFuncs
+            shpEnrich = self.shp
+            shpxEnrich = self.shpx
+            BonU = None
+        a = 1 / self.kappa * shpEnrich.dot(np.diag(self.wi).dot(self.shp.T))
         A = np.repeat(self.dist, self.numBasisFuncs) / \
             2 * block_diag(*[a] * (self.n_ele))
-        b = (self.shpx.T * np.ones((self.gqOrder, self.numBasisFuncs))
+        b = (shpxEnrich.T * np.ones((self.gqOrder, numBasisFuncsEnrich))
              ).T.dot(np.diag(self.wi).dot(self.shp.T))
         B = block_diag(*[b] * (self.n_ele))
-        d = self.shp.dot(np.diag(self.wi).dot(self.shp.T))
+        d = shpEnrich.dot(np.diag(self.wi).dot(self.shp.T))
         # assemble D
-        d_face = np.zeros((self.numBasisFuncs, self.numBasisFuncs))
+        d_face = np.zeros((numBasisFuncsEnrich, self.numBasisFuncs))
         d_face[0, 0] = self.tau_pos
         d_face[-1, -1] = self.tau_neg
         D = np.repeat(self.dist, self.numBasisFuncs) / 2 * \
             block_diag(*[d] * (self.n_ele)) + \
             block_diag(*[d_face] * (self.n_ele))
-        return A, B, D
+        eleMat = namedtuple('eleMat', ['A', 'B', 'BonU', 'D'])
+        return eleMat(A, B, BonU, D)
 
     def interfaceGen(self):
         """Generate matrices associated with interfaces"""
+        if self.enrich is not None:
+            # when enrich is given
+            # provide matrices used in the DWR residual calculation
+            numBasisFuncs = self.numBasisFuncs + self.enrich
+        else:
+            numBasisFuncs = self.numBasisFuncs
         tau_pos, tau_neg, conv = self.tau_pos, self.tau_neg, self.conv
         # elemental h
         h = np.zeros((2, 2))
@@ -128,17 +161,17 @@ class discretization(object):
         H = H[1:self.n_ele][:, 1:self.n_ele]
 
         # elemental e
-        e = np.zeros((self.numBasisFuncs, 2))
+        e = np.zeros((numBasisFuncs, 2))
         e[0, 0], e[-1, -1] = -conv - tau_pos, conv - tau_neg
         # mapping matrix
-        map_e_x = np.arange(self.numBasisFuncs * self.n_ele,
+        map_e_x = np.arange(numBasisFuncs * self.n_ele,
                             dtype=int).reshape(self.n_ele,
-                                               self.numBasisFuncs).T
+                                               numBasisFuncs).T
         map_e_y = map_h
         # assemble global E
-        E = np.zeros((self.numBasisFuncs * self.n_ele, self.n_ele + 1))
+        E = np.zeros((numBasisFuncs * self.n_ele, self.n_ele + 1))
         for i in range(self.n_ele):
-            for j in range(self.numBasisFuncs):
+            for j in range(numBasisFuncs):
                 m = map_e_x[j, i]
                 for k in range(2):
                     n = map_e_y[k, i]
@@ -146,12 +179,12 @@ class discretization(object):
         E = E[:, 1:self.n_ele]
 
         # elemental c
-        c = np.zeros((self.numBasisFuncs, 2))
+        c = np.zeros((numBasisFuncs, 2))
         c[0, 0], c[-1, -1] = -1, 1
         # assemble global C
-        C = np.zeros((self.numBasisFuncs * self.n_ele, self.n_ele + 1))
+        C = np.zeros((numBasisFuncs * self.n_ele, self.n_ele + 1))
         for i in range(self.n_ele):
-            for j in range(self.numBasisFuncs):
+            for j in range(numBasisFuncs):
                 m = map_e_x[j, i]
                 for k in range(2):
                     n = map_e_y[k, i]
@@ -159,21 +192,21 @@ class discretization(object):
         C = C[:, 1:self.n_ele]
 
         # elemental g
-        g = np.zeros((2, self.numBasisFuncs))
+        g = np.zeros((2, numBasisFuncs))
         g[0, 0], g[-1, -1] = tau_pos, tau_neg
         # mapping matrix
         map_g_x = map_h
-        map_g_y = np.arange(self.numBasisFuncs * self.n_ele,
+        map_g_y = np.arange(numBasisFuncs * self.n_ele,
                             dtype=int).reshape(self.n_ele,
-                                               self.numBasisFuncs).T
+                                               numBasisFuncs).T
         # assemble global G
-        G = np.zeros((self.n_ele + 1, self.numBasisFuncs * self.n_ele))
+        G = np.zeros((self.n_ele + 1, numBasisFuncs * self.n_ele))
         for i in range(self.n_ele):
             for j in range(2):
                 m = map_g_x[j, i]
-                for k in range(self.numBasisFuncs):
+                for k in range(numBasisFuncs):
                     n = map_g_y[k, i]
                     G[m, n] += g[j, k]
         G = G[1:self.n_ele, :]
-
-        return C, E, G, H
+        faceMat = namedtuple('faceMat', ['C', 'E', 'G', 'H'])
+        return faceMat(C, E, G, H)
