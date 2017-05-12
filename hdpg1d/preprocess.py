@@ -38,7 +38,7 @@ class discretization(object):
         self.mesh = mesh
         self.coeff = coeff
         self.enrich = enrich
-        # p is the number of basis functions
+        # the following init are for the sake of simplicity
         self.numBasisFuncs = coeff.pOrder + 1
         self.tau_pos = coeff.tauPlus
         self.tau_neg = coeff.tauMinus
@@ -61,28 +61,31 @@ class discretization(object):
             dist[i - 1] = self.mesh[i] - self.mesh[i - 1]
         return dist
 
-    def matGen(self):
-        self.lhsGen()
-        self.eleGen()
-        self.interfaceGen()
-
     def lhsGen(self):
         """Generate matrices associated with left hand side"""
-        # elemental forcing vector F
-        F = np.zeros(self.numBasisFuncs * self.n_ele)
+        if self.enrich is not None:
+            numBasisFuncs = self.numBasisFuncs + self.enrich
+            shp = self.shpEnrich
+        else:
+            numBasisFuncs = self.numBasisFuncs
+            shp = self.shp
+        # forcing vector F
+        F = np.zeros(numBasisFuncs * self.n_ele)
         for i in range(1, self.n_ele + 1):
-            f = self.dist[i - 1] / 2 * self.shp.dot(
-                self.wi * forcing(self.mesh[i - 1] + 1 / 2 * (1 + self.xi) * self.dist[i - 1]))
-            F[(i - 1) * self.numBasisFuncs:i * self.numBasisFuncs] = f
+            f = self.dist[i - 1] / 2 \
+                * shp.dot(self.wi * forcing(self.mesh[i - 1] +
+                                            1 / 2 * (1 + self.xi) *
+                                            self.dist[i - 1]))
+            F[(i - 1) * numBasisFuncs:i * numBasisFuncs] = f
         F[0] += (self.conv + self.tau_pos) * bc(0)[0]
         F[-1] += (-self.conv + self.tau_neg) * bc(0)[1]
         # L, easy in 1d
         L = np.zeros(self.n_ele - 1)
         # R, easy in 1d
-        R = np.zeros(self.numBasisFuncs * self.n_ele)
+        R = np.zeros(numBasisFuncs * self.n_ele)
         R[0] = bc(0)[0]
         R[-1] = -bc(0)[1]
-        self.F, self.L, self.R = F, L, R
+        return F, L, R
 
     def eleGen(self):
         """Generate matrices associated with elements"""
@@ -93,14 +96,14 @@ class discretization(object):
              ).T.dot(np.diag(self.wi).dot(self.shp.T))
         B = block_diag(*[b] * (self.n_ele))
         d = self.shp.dot(np.diag(self.wi).dot(self.shp.T))
-        # assemble global D
+        # assemble D
         d_face = np.zeros((self.numBasisFuncs, self.numBasisFuncs))
         d_face[0, 0] = self.tau_pos
         d_face[-1, -1] = self.tau_neg
         D = np.repeat(self.dist, self.numBasisFuncs) / 2 * \
             block_diag(*[d] * (self.n_ele)) + \
             block_diag(*[d_face] * (self.n_ele))
-        self.A, self.B, self.D = A, B, D
+        return A, B, D
 
     def interfaceGen(self):
         """Generate matrices associated with interfaces"""
@@ -129,7 +132,8 @@ class discretization(object):
         e[0, 0], e[-1, -1] = -conv - tau_pos, conv - tau_neg
         # mapping matrix
         map_e_x = np.arange(self.numBasisFuncs * self.n_ele,
-                            dtype=int).reshape(self.n_ele, self.numBasisFuncs).T
+                            dtype=int).reshape(self.n_ele,
+                                               self.numBasisFuncs).T
         map_e_y = map_h
         # assemble global E
         E = np.zeros((self.numBasisFuncs * self.n_ele, self.n_ele + 1))
@@ -160,7 +164,8 @@ class discretization(object):
         # mapping matrix
         map_g_x = map_h
         map_g_y = np.arange(self.numBasisFuncs * self.n_ele,
-                            dtype=int).reshape(self.n_ele, self.numBasisFuncs).T
+                            dtype=int).reshape(self.n_ele,
+                                               self.numBasisFuncs).T
         # assemble global G
         G = np.zeros((self.n_ele + 1, self.numBasisFuncs * self.n_ele))
         for i in range(self.n_ele):
@@ -171,4 +176,4 @@ class discretization(object):
                     G[m, n] += g[j, k]
         G = G[1:self.n_ele, :]
 
-        self.C, self.E, self.G, self.H = C, E, G, H
+        return C, E, G, H

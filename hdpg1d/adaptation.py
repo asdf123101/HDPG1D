@@ -2,7 +2,6 @@ import numpy as np
 from numpy import concatenate as cat
 import matplotlib.pyplot as plt
 import warnings
-from matplotlib import rc
 from .preprocess import shape, discretization
 
 plt.rc('text', usetex=True)
@@ -21,13 +20,13 @@ class hdpg1d(object):
         self.numBasisFuncs = coeff.pOrder + 1
         self.tau_pos = coeff.tauPlus
         self.tau_neg = coeff.tauMinus
-        self.mesh = np.linspace(0, 1, self.numEle + 1)
         self.c = coeff.convection
         self.kappa = coeff.diffusion
         self.coeff = coeff
+        self.mesh = np.linspace(0, 1, self.numEle + 1)
         self.u = []
-        self.estErrorList = []
-        self.trueErrorList = []
+        self.estErrorList = [[], []]
+        self.trueErrorList = [[], []]
 
     def bc(self, case, t=None):
         # boundary condition
@@ -87,22 +86,24 @@ class hdpg1d(object):
         """Solve the primal problem"""
         if 'matLocal' in locals():
             # if matLocal exists,
-            # only change the mesh instead of initialize again
+            # only change the mesh instead of initializing again
             matLocal.mesh = self.mesh
         else:
             matLocal = discretization(self.coeff, self.mesh)
-        matLocal.matGen()
+        F, L, R = matLocal.lhsGen()
+        A, B, D = matLocal.eleGen()
+        C, E, G, H = matLocal.interfaceGen()
         # solve
-        K = -cat((matLocal.C.T, matLocal.G), axis=1)\
-            .dot(np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]]))
-                 .dot(cat((matLocal.C, matLocal.E)))) + matLocal.H
-        F_hat = np.array([matLocal.L]).T - cat((matLocal.C.T, matLocal.G), axis=1)\
-            .dot(np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]])))\
-            .dot(np.array([cat((matLocal.R, matLocal.F))]).T)
+        K = -cat((C.T, G), axis=1)\
+            .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))
+                 .dot(cat((C, E)))) + H
+        F_hat = np.array([L]).T - cat((C.T, G), axis=1)\
+            .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]])))\
+            .dot(np.array([cat((R, F))]).T)
         uFace = np.linalg.solve(K, F_hat)
-        u = np.linalg.inv(np.bmat([[matLocal.A, -matLocal.B], [matLocal.B.T, matLocal.D]]))\
-            .dot(np.array([np.concatenate((matLocal.R, matLocal.F))]).T -
-                 cat((matLocal.C, matLocal.E)).dot(uFace))
+        u = np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))\
+            .dot(np.array([np.concatenate((R, F))]).T -
+                 cat((C, E)).dot(uFace))
         # self.u = u.A1
         return u.A1, uFace.A1
 
@@ -114,22 +115,34 @@ class hdpg1d(object):
             matAdjoint.mesh = self.mesh
         else:
             matAdjoint = discretization(self.coeff, self.mesh)
-        matAdjoint.matGen()
         self.coeff.pOrder = self.coeff.pOrder - 1
+        F, L, R = matAdjoint.lhsGen()
+        A, B, D = matAdjoint.eleGen()
+        C, E, G, H = matAdjoint.interfaceGen()
         # add adjoint LHS conditions
-        matAdjoint.F = np.zeros(len(matAdjoint.F))
-        matAdjoint.R[-1] = -self.bc(1)[1]
+        F = np.zeros(len(F))
+        R[-1] = -self.bc(1)[1]
 
         # assemble global matrix LHS
-        LHS = np.bmat([[matAdjoint.A, -matAdjoint.B, matAdjoint.C],
-                       [matAdjoint.B.T, matAdjoint.D, matAdjoint.E],
-                       [matAdjoint.C.T, matAdjoint.G, matAdjoint.H]])
+        LHS = np.bmat([[A, -B, C],
+                       [B.T, D, E],
+                       [C.T, G, H]])
         # solve
         U = np.linalg.solve(LHS.T, np.concatenate(
-            (matAdjoint.R, matAdjoint.F, matAdjoint.L)))
-        return U[0:2 * len(matAdjoint.C)], U[len(matAdjoint.C):len(U)]
+            (R, F, L)))
+        return U[0:2 * len(C)], U[len(C):len(U)]
 
     def residual(self, U, hat_U, z, hat_z):
+        if 'matResidual' in locals():
+            # if matLocal exists,
+            # only change the mesh instead of initializing again
+            matResidual.mesh = self.mesh
+        else:
+            matResidual = discretization(self.coeff, self.mesh, 1)
+        F, L, R = matResidual.lhsGen()
+        # A, B, D = matResidual.eleGen()
+        # C, E, G, H = matResidual.interfaceGen()
+
         numEle = self.numEle
         p = self.numBasisFuncs + 1
 
@@ -171,19 +184,15 @@ class hdpg1d(object):
         U_hat[-1] = self.bc(0)[1]
 
         # L, easy in 1d
-        L = np.zeros(numEle + 1)
+        # L = np.zeros(numEle + 1)
 
         # R, easy in 1d
         RR = np.zeros(p * numEle)
 
         # elemental forcing vector
         dist = np.zeros(numEle)
-        F = np.zeros(p * numEle)
         for i in range(1, numEle + 1):
             dist[i - 1] = self.mesh[i] - self.mesh[i - 1]
-            f = dist[i - 1] / 2 * shp.dot(
-                wi * self.forcing(self.mesh[i - 1] + 1 / 2 * (1 + xi) * dist[i - 1]))
-            F[(i - 1) * p:(i - 1) * p + p] = f
 
         # elemental h
         h = np.zeros((2, 2))
@@ -239,10 +248,10 @@ class hdpg1d(object):
         C = C[:, 1:numEle]
 
         # L, easy in 1d
-        L = np.zeros(numEle - 1)
+        # L = np.zeros(numEle - 1)
 
         # residual vector
-        R = np.zeros(self.numEle)
+        Residual = np.zeros(self.numEle)
         for i in np.arange(self.numEle):
             a = dist[i] / 2 * 1 / kappa * \
                 ((shp.T).T).dot(np.diag(wi).dot(shp_l.T))
@@ -272,25 +281,23 @@ class hdpg1d(object):
             m = np.zeros((2, p_l))
             m[0, 0], m[-1, -1] = -1, 1
             # local error
-            R[i] = (np.concatenate((a.dot(q[p_l * i:p_l * i + p_l]) + -b.dot(u[p_l * i:p_l * i + p_l]) + c.dot(U_hat[i:i + 2]),
-                                    b_t.T.dot(q[p_l * i:p_l * i + p_l]) + d.dot(u[p_l * i:p_l * i + p_l]) + e.dot(U_hat[i:i + 2]))) - np.concatenate((RR[p * i:p * i + p], F[p * i:p * i + p]))).dot(1 - np.concatenate((z_q[p * i:p * i + p], z_u[p * i:p * i + p])))
+            Residual[i] = (np.concatenate((a.dot(q[p_l * i:p_l * i + p_l]) + -b.dot(u[p_l * i:p_l * i + p_l]) + c.dot(U_hat[i:i + 2]),
+                                           b_t.T.dot(q[p_l * i:p_l * i + p_l]) + d.dot(u[p_l * i:p_l * i + p_l]) + e.dot(U_hat[i:i + 2]))) - np.concatenate((R[p * i:p * i + p], F[p * i:p * i + p]))).dot(1 - np.concatenate((z_q[p * i:p * i + p], z_u[p * i:p * i + p])))
 
-        com_index = np.argsort(np.abs(R))
+        com_index = np.argsort(np.abs(Residual))
         # select \theta% elements with the large error
         theta = 0.15
-        refine_index = com_index[int(self.numEle * (1 - theta)):len(R)]
+        refine_index = com_index[int(self.numEle * (1 - theta)):len(Residual)]
 
         # global error
         R_g = (C.T.dot(q) + G.dot(u) + H.dot(U_hat[1:-1])).dot(1 - z_hat)
-        return np.abs(np.sum(R) + np.sum(R_g)), refine_index + 1
+        return np.abs(np.sum(Residual) + np.sum(R_g)), refine_index + 1
 
     def adaptive(self):
         tol = 1e-10
         estError = 10
         counter = 0
-        ceilCounter = 50
-        trueErrorList = [[], []]
-        estErrorList = [[], []]
+        ceilCounter = 30
         while estError > tol and counter < ceilCounter:
             print("Iteration {}. Target function error {:.3e}.".format(
                 counter, estError))
@@ -302,16 +309,14 @@ class hdpg1d(object):
             if counter in [0, 4, 9, 19]:
                 self.plotU(counter)
             # record error
-            trueErrorList[0].append(self.numEle)
-            trueErrorList[1].append(u[self.numEle * self.numBasisFuncs - 1])
+            self.trueErrorList[0].append(self.numEle)
+            self.trueErrorList[1].append(
+                u[self.numEle * self.numBasisFuncs - 1])
             estError, index = self.residual(u, uFace, adjoint, adjointFace)
-            estErrorList[0].append(self.numEle)
-            estErrorList[1].append(estError)
+            self.estErrorList[0].append(self.numEle)
+            self.estErrorList[1].append(estError)
             # adapt
             index = index.tolist()
             self.meshAdapt(index)
             self.numEle = self.numEle + len(index)
             counter += 1
-        # save error
-        self.trueErrorList = trueErrorList
-        self.estErrorList = estErrorList
