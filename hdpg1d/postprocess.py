@@ -16,16 +16,18 @@ class utils(object):
         # approximate the exact solution for general problems
         # self.exactSol = self.solution.solveLocal()[0][exactNumEle * exactBasisFuncs - 1]
         # for the reaction diffusion test problem, we know the exact solution
-        self.exactSol = np.sqrt(self.solution.kappa)
+        self.exactSol = np.sqrt(self.solution.coeff.diffusion)
 
     def errorL2(self):
         errorL2 = 0.
         numEle = self.solution.coeff.numEle
+        self.solution.numEle = numEle
         numBasisFuncs = self.solution.coeff.pOrder + 1
         # solve on the uniform mesh
         self.solution.mesh = np.linspace(0, 1, numEle + 1)
-        U = self.solution.solveLocal()[0]
-        errorL2 = np.abs(U[numBasisFuncs * numEle - 1] - self.exactSol)
+        self.solution.solveLocal()
+        gradState, _ = self.solution.separateSoln(self.solution.primalSoln)
+        errorL2 = np.abs(gradState[numBasisFuncs * numEle - 1] - self.exactSol)
         return errorL2
 
     def uniConv(self):
