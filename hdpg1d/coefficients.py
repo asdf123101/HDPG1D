@@ -29,5 +29,6 @@ class coefficients:
                 print("Sorry, wrong data type.")
                 continue
             else:
+                print("Something is wrong. Exit.")
                 break
         return cls(diff, conv, reaction, pOrder, numEle, tauPlus, tauMinus)

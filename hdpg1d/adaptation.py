@@ -69,7 +69,7 @@ class hdpg1d(object):
                           self.mesh[index[i] - 1]) / 2
         self.mesh = np.sort(np.insert(self.mesh, 0, inValue))
 
-    def solveLocal(self):
+    def solvePrimal(self):
         """Solve the primal problem"""
         if 'matLocal' in locals():
             # if matLocal exists,
@@ -155,7 +155,7 @@ class hdpg1d(object):
         maxCount = 30
         while estError > TOL and nodeCount < maxCount:
             # solve
-            self.solveLocal()
+            self.solvePrimal()
             self.solveAdjoint()
             # plot the solution at certain counter
             if nodeCount in [0, 4, 9, 19, maxCount]:
@@ -173,12 +173,10 @@ class hdpg1d(object):
             self.meshAdapt(index)
             self.numEle = self.numEle + len(index)
             nodeCount += 1
-            print("Iteration {}. Target function error {:.3e}.".format(
-                nodeCount, estError))
+            print("Iteration {}. Estimated target function error {:.3e}."
+                  .format(nodeCount, estError))
             if nodeCount == maxCount:
                 print("Max iteration number is reached "
                       "while the convergence criterion is not satisfied.\n"
                       "Check the problem statement or "
                       "raise the max iteration number, then try again.\n")
-                from .solve import runInteractive
-                runInteractive()

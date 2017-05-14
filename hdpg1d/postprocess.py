@@ -19,7 +19,7 @@ class utils(object):
         self.solution.coeff.pOrder = self.exactBasisFuncs - 1
         self.solution.mesh = np.linspace(0, 1, self.exactNumEle + 1)
         # approximate the exact solution for general problems
-        self.solution.solveLocal()
+        self.solution.solvePrimal()
         exactSoln = self.solution.separateSoln(self.solution.primalSoln)[0][
             self.exactNumEle * self.exactBasisFuncs - 1]
         # for the reaction diffusion test problem, we know the exact solution
@@ -33,7 +33,7 @@ class utils(object):
         numBasisFuncs = self.solution.coeff.pOrder + 1
         # solve on the uniform mesh
         self.solution.mesh = np.linspace(0, 1, numEle + 1)
-        self.solution.solveLocal()
+        self.solution.solvePrimal()
         gradState, _ = self.solution.separateSoln(self.solution.primalSoln)
         errorL2 = np.abs(
             gradState[numBasisFuncs * numEle - 1] - self.exactSoln)
