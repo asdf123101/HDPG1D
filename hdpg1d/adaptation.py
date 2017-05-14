@@ -21,6 +21,7 @@ class hdpg1d(object):
         self.numBasisFuncs = coeff.pOrder + 1
         self.coeff = coeff
         self.mesh = np.linspace(0, 1, self.numEle + 1)
+        self.enrichOrder = 1
         self.primalSoln = None
         self.adjointSoln = None
         self.estErrorList = [[], []]
@@ -34,8 +35,8 @@ class hdpg1d(object):
 
     def plotState(self, counter):
         """Plot solution u with smooth higher oredr quadrature"""
-        uSmooth = np.array([])
-        uNode = np.zeros(self.numEle + 1)
+        stateSmooth = np.array([])
+        stateNode = np.zeros(self.numEle + 1)
         xSmooth = np.array([])
         gradState, _ = self.separateSoln(self.primalSoln)
         halfLenState = int(len(gradState) / 2)
@@ -47,19 +48,18 @@ class hdpg1d(object):
         for j in range(1, self.numEle + 1):
             xSmooth = np.hstack((xSmooth, (self.mesh[(j - 1)] + self.mesh[j]) / 2 + (
                 self.mesh[j] - self.mesh[j - 1]) / 2 * xi))
-            uSmooth = np.hstack(
-                (uSmooth, shp.T.dot(state[(j - 1) * self.numBasisFuncs:j * self.numBasisFuncs])))
-            uNode[j - 1] = state[(j - 1) * self.numBasisFuncs]
-        uNode[-1] = state[-1]
+            stateSmooth = np.hstack(
+                (stateSmooth, shp.T.dot(state[(j - 1) * self.numBasisFuncs:j * self.numBasisFuncs])))
+            stateNode[j - 1] = state[(j - 1) * self.numBasisFuncs]
+        stateNode[-1] = state[-1]
         plt.figure(1)
-        plt.plot(xSmooth, uSmooth, '-', color='C3')
-        plt.plot(self.mesh, uNode, 'C3.')
+        plt.plot(xSmooth, stateSmooth, '-', color='C3')
+        plt.plot(self.mesh, stateNode, 'C3.')
         plt.xlabel('$x$', fontsize=17)
         plt.ylabel('$u$', fontsize=17)
         # plt.axis([-0.05, 1.05, 0, 1.3])
         plt.grid()
         plt.pause(5e-1)
-        plt.clf()
 
     def meshAdapt(self, index):
         """Given the index list, adapt the mesh"""
@@ -79,7 +79,7 @@ class hdpg1d(object):
             matLocal = discretization(self.coeff, self.mesh)
         matGroup = matLocal.matGroup()
         A, B, _, C, D, E, F, G, H, L, R = matGroup
-        # solve
+        # solve by exploiting the local global separation
         K = -cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))
                  .dot(cat((C, E)))) + H
@@ -110,24 +110,23 @@ class hdpg1d(object):
         LHS = np.bmat([[A, -B, C],
                        [B.T, D, E],
                        [C.T, G, H]])
-        # solve
+        # solve in one shoot
         soln = np.linalg.solve(LHS.T, cat((R, F, L)))
         self.adjointSoln = soln
 
-    def residual(self):
-        enrich = 1
+    def DWResidual(self):
         if 'matResidual' in locals():
             matResidual.mesh = self.mesh
         else:
-            matResidual = discretization(self.coeff, self.mesh, enrich)
+            matResidual = discretization(
+                self.coeff, self.mesh, self.enrichOrder)
         matGroup = matResidual.matGroup()
-        A, B, BonU, C, D, E, F, G, H, L, R = matGroup
+        A, B, BonQ, C, D, E, F, G, H, L, R = matGroup
         LHS = np.bmat([[A, -B, C],
-                       [BonU, D, E]])
+                       [BonQ, D, E]])
         RHS = cat((R, F))
         residual = np.zeros(self.numEle)
-        numEnrich = self.numBasisFuncs + enrich
-        primalGradState, primalStateFace = self.separateSoln(self.primalSoln)
+        numEnrich = self.numBasisFuncs + self.enrichOrder
         adjointGradState, adjointStateFace = self.separateSoln(
             self.adjointSoln)
         for i in np.arange(self.numEle):
@@ -150,28 +149,36 @@ class hdpg1d(object):
         return np.abs(np.sum(residual)), refineIndex
 
     def adaptive(self):
-        tol = 1e-10
+        TOL = 1e-10
         estError = 10
-        counter = 0
-        ceilCounter = 30
-        while estError > tol and counter < ceilCounter:
-            print("Iteration {}. Target function error {:.3e}.".format(
-                counter, estError))
+        nodeCount = 0
+        maxCount = 30
+        while estError > TOL and nodeCount < maxCount:
             # solve
             self.solveLocal()
             self.solveAdjoint()
             # plot the solution at certain counter
-            if counter in [0, 4, 9, 19]:
-                self.plotState(counter)
+            if nodeCount in [0, 4, 9, 19, maxCount]:
+                plt.clf()
+                self.plotState(nodeCount)
             # record error
             self.trueErrorList[0].append(self.numEle)
             self.trueErrorList[1].append(
                 self.primalSoln[self.numEle * self.numBasisFuncs - 1])
-            estError, index = self.residual()
+            estError, index = self.DWResidual()
             self.estErrorList[0].append(self.numEle)
             self.estErrorList[1].append(estError)
             # adapt
             index = index.tolist()
             self.meshAdapt(index)
             self.numEle = self.numEle + len(index)
-            counter += 1
+            nodeCount += 1
+            print("Iteration {}. Target function error {:.3e}.".format(
+                nodeCount, estError))
+            if nodeCount == maxCount:
+                print("Max iteration number is reached "
+                      "while the convergence criterion is not satisfied.\n"
+                      "Check the problem statement or "
+                      "raise the max iteration number, then try again.\n")
+                from .solve import runInteractive
+                runInteractive()

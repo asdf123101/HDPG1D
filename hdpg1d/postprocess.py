@@ -6,17 +6,25 @@ import numpy as np
 
 
 class utils(object):
+    exactNumEle = 300
+    exactBasisFuncs = 5
+
     def __init__(self, solution):
         self.solution = solution
-        exactNumEle = 500
-        exactBasisFuncs = 5
-        self.solution.coeff.numEle = exactNumEle
-        self.solution.coeff.pOrder = exactBasisFuncs - 1
-        self.solution.mesh = np.linspace(0, 1, exactNumEle + 1)
+        self.numEle = self.exactNumEle
+        self.exactSoln = self.solveExact()
+
+    def solveExact(self):
+        self.solution.coeff.numEle = self.exactNumEle
+        self.solution.coeff.pOrder = self.exactBasisFuncs - 1
+        self.solution.mesh = np.linspace(0, 1, self.exactNumEle + 1)
         # approximate the exact solution for general problems
-        # self.exactSol = self.solution.solveLocal()[0][exactNumEle * exactBasisFuncs - 1]
+        self.solution.solveLocal()
+        exactSoln = self.solution.separateSoln(self.solution.primalSoln)[0][
+            self.exactNumEle * self.exactBasisFuncs - 1]
         # for the reaction diffusion test problem, we know the exact solution
-        self.exactSol = np.sqrt(self.solution.coeff.diffusion)
+        # self.exactSol = np.sqrt(self.solution.coeff.diffusion)
+        return exactSoln
 
     def errorL2(self):
         errorL2 = 0.
@@ -27,7 +35,8 @@ class utils(object):
         self.solution.mesh = np.linspace(0, 1, numEle + 1)
         self.solution.solveLocal()
         gradState, _ = self.solution.separateSoln(self.solution.primalSoln)
-        errorL2 = np.abs(gradState[numBasisFuncs * numEle - 1] - self.exactSol)
+        errorL2 = np.abs(
+            gradState[numBasisFuncs * numEle - 1] - self.exactSoln)
         return errorL2
 
     def uniConv(self):
@@ -44,9 +53,12 @@ class utils(object):
 
     def convHistory(self):
         """Plot the uniform and adaptive convergence history"""
+        print("Please note that the error is calculated using {} "
+              "elements with polynomial order {}."
+              .format(self.exactNumEle, self.exactBasisFuncs))
         plt.figure(2)
         trueErrorList = self.solution.trueErrorList
-        trueErrorList[1] = np.abs(trueErrorList[1] - self.exactSol)
+        trueErrorList[1] = np.abs(trueErrorList[1] - self.exactSoln)
         estErrorList = self.solution.estErrorList
         plt.loglog(trueErrorList[0],
                    trueErrorList[1], '-ro')
