@@ -1,7 +1,6 @@
 from .coefficients import coefficients
-from .discretization import HDPG1d
-from .postprocess import convHistory
-import sys
+from .adaptation import hdpg1d
+from .postprocess import utils
 
 
 def queryYesNo(question, default="yes"):
@@ -17,28 +16,28 @@ def queryYesNo(question, default="yes"):
         raise ValueError("invalid default answer: '%s'" % default)
 
     while True:
-        sys.stdout.write(question + prompt)
+        print(question + prompt)
         choice = input().lower()
         if default is not None and choice == '':
             return valid[default]
         elif choice in valid:
             return valid[choice]
         else:
-            sys.stdout.write("Please respond with 'yes' or 'no' "
-                             "(or 'y' or 'n').\n")
+            print("Please respond with 'yes' or 'no' "
+                  "(or 'y' or 'n').\n")
 
 
 def getCoefficients():
     question = 'Do you want to use the default parameters?'
     isDefault = queryYesNo(question, "yes")
     if (isDefault):
-        Coeff = coefficients(1, 1, 0, 2, 2)
+        Coeff = coefficients(1e-6, 0, 1, 2, 2, 1, 1)
     else:
-        Coeff = coefficients.from_input()
+        Coeff = coefficients.fromInput()
     return Coeff
 
 
-def run():
+def menu():
     menu = {}
     menu['1.'] = "Solve with HDG."
     menu['2.'] = "Solve with HDPG."
@@ -47,15 +46,29 @@ def run():
     for key, value in sorted(menu.items()):
         print(key, value)
 
+
+def hdgSolve():
+    hdgCoeff = getCoefficients()
+    print("Solving...")
+    hdgSolution = hdpg1d(hdgCoeff)
+    # solve the problem adaptively and plot convergence history
+    hdgSolution.adaptive()
+    print("Problem solved. Please check the convergence plot.")
+    utils(hdgSolution).convHistory()
+
+
+def runInteractive():
+    menu()
     selection = input("Please Select: ")
-    if selection == '1':
-        hdgCoeff = getCoefficients()
-        hdgSolution = HDPG1d(hdgCoeff.nele, hdgCoeff.porder)
-        trueError, estError = hdgSolution.adaptive()
-        convHistory(trueError, estError)
-    elif selection == '2':
-        print("In development...")
-    elif selection == '3':
-        print("Bye.")
-    else:
-        print("Unknown Option Selected!")
+    while True:
+        if selection == '1':
+            hdgSolve()
+            break
+        elif selection == '2':
+            print("In development...")
+        elif selection == '3':
+            print("Bye.")
+            break
+        else:
+            print("Unknown Option Selected!")
+            continue

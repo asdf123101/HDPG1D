@@ -1,7 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-
+MANIFEST
 # C extensions
 *.so
 
@@ -84,3 +84,6 @@ venv
 # Org-mode
 .org-id-locations
 *_archive
+
+# markdown preview
+.markdown*

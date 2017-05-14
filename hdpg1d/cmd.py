@@ -1,8 +1,8 @@
 """
 command line interface
 """
-from .solve import run
+from .solve import runInteractive
 
 
 def main():
-    run()
+    runInteractive()
