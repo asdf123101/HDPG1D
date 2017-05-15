@@ -1,6 +1,15 @@
+import json
 import numpy as np
+import os
 from collections import namedtuple
 from scipy.linalg import block_diag
+
+for loc in os.curdir, os.path.expanduser("~"), "/etc/hdpg1d":
+    try:
+        with open(os.path.join(loc, "config.json")) as source:
+            data = json.load(source)
+    except IOError:
+        pass
 
 
 def shape(x, p):
