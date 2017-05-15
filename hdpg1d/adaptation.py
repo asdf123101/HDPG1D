@@ -1,5 +1,7 @@
 import numpy as np
 from numpy import concatenate as cat
+from scipy.sparse import csr_matrix
+import scipy.sparse.linalg as spla
 from copy import copy
 import matplotlib.pyplot as plt
 import warnings
@@ -83,14 +85,22 @@ class hdpg1d(object):
         K = -cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))
                  .dot(cat((C, E)))) + H
+        sK = csr_matrix(K)
         F_hat = np.array([L]).T - cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]])))\
             .dot(np.array([cat((R, F))]).T)
-        stateFace = np.linalg.solve(K, F_hat)
-        gradState = np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))\
-            .dot(np.array([np.concatenate((R, F))]).T -
-                 cat((C, E)).dot(stateFace))
-        self.primalSoln = cat((gradState.A1, stateFace.A1))
+
+        def M_x(vec):
+            """Construct preconditioner"""
+            matVec = spla.spsolve(sK, vec)
+            return matVec
+        n = len(F_hat)
+        preconditioner = spla.LinearOperator((n, n), M_x)
+        stateFace = spla.gmres(sK, F_hat, M=preconditioner)[0]
+        # stateFace = np.linalg.solve(K, F_hat)
+        gradState = np.linalg.inv(np.asarray(np.bmat([[A, -B], [B.T, D]]))).dot(
+            cat((R, F)) - cat((C, E)).dot(stateFace))
+        self.primalSoln = cat((gradState, stateFace))
 
     def solveAdjoint(self):
         """Solve the adjoint problem"""
@@ -110,8 +120,18 @@ class hdpg1d(object):
         LHS = np.bmat([[A, -B, C],
                        [B.T, D, E],
                        [C.T, G, H]])
-        # solve in one shoot
-        soln = np.linalg.solve(LHS.T, cat((R, F, L)))
+        sLHS = csr_matrix(LHS)
+        RHS = cat((R, F, L))
+
+        # solve in one shoot using GMRES
+
+        def M_x(vec):
+            """Construct preconditioner"""
+            matVec = spla.spsolve(sLHS, vec)
+            return matVec
+        n = len(RHS)
+        preconditioner = spla.LinearOperator((n, n), M_x)
+        soln = spla.gmres(sLHS, RHS, M=preconditioner)[0]
         self.adjointSoln = soln
 
     def DWResidual(self):
@@ -152,7 +172,7 @@ class hdpg1d(object):
         TOL = 1e-10
         estError = 10
         nodeCount = 0
-        maxCount = 30
+        maxCount = 40
         while estError > TOL and nodeCount < maxCount:
             # solve
             self.solvePrimal()
