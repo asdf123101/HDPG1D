@@ -3,7 +3,7 @@ import pytest
 import math
 import matplotlib
 matplotlib.use('Agg')           # supress figures in the following modules
-from hdpg1d.coefficients import coefficients as coeff
+from hdpg1d.preprocess import coefficients as coeff
 from hdpg1d.adaptation import hdpg1d
 
 

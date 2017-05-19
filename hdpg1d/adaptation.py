@@ -90,12 +90,12 @@ class hdpg1d(object):
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]])))\
             .dot(np.array([cat((R, F))]).T)
 
-        def M_x(vec):
+        def invRHS(vec):
             """Construct preconditioner"""
             matVec = spla.spsolve(sK, vec)
             return matVec
         n = len(F_hat)
-        preconditioner = spla.LinearOperator((n, n), M_x)
+        preconditioner = spla.LinearOperator((n, n), invRHS)
         stateFace = spla.gmres(sK, F_hat, M=preconditioner)[0]
         # stateFace = np.linalg.solve(K, F_hat)
         gradState = np.linalg.inv(np.asarray(np.bmat([[A, -B], [B.T, D]]))).dot(
@@ -115,7 +115,7 @@ class hdpg1d(object):
         A, B, _, C, D, E, F, G, H, L, R = matGroup
         # add adjoint LHS conditions
         F = np.zeros(len(F))
-        R[-1] = -boundaryCondition(1)[1]
+        R[-1] = -boundaryCondition('adjoint')[1]
         # assemble global matrix LHS
         LHS = np.bmat([[A, -B, C],
                        [B.T, D, E],
@@ -124,14 +124,14 @@ class hdpg1d(object):
         RHS = cat((R, F, L))
 
         # solve in one shoot using GMRES
-
-        def M_x(vec):
+        def invRHS(vec):
             """Construct preconditioner"""
             matVec = spla.spsolve(sLHS, vec)
             return matVec
         n = len(RHS)
-        preconditioner = spla.LinearOperator((n, n), M_x)
+        preconditioner = spla.LinearOperator((n, n), invRHS)
         soln = spla.gmres(sLHS, RHS, M=preconditioner)[0]
+        # soln = np.linalg.solve(LHS.T, RHS)
         self.adjointSoln = soln
 
     def DWResidual(self):

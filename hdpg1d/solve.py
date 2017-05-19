@@ -1,40 +1,6 @@
-from .coefficients import coefficients
+from .preprocess import setDefaultCoefficients
 from .adaptation import hdpg1d
 from .postprocess import utils
-
-
-def queryYesNo(question, default="yes"):
-    valid = {"yes": True, "y": True, "ye": True,
-             "no": False, "n": False}
-    if default is None:
-        prompt = " [y/n] "
-    elif default == "yes":
-        prompt = " [Y/n] "
-    elif default == "no":
-        prompt = " [y/N] "
-    else:
-        raise ValueError("invalid default answer: '%s'" % default)
-
-    while True:
-        print(question + prompt)
-        choice = input().lower()
-        if default is not None and choice == '':
-            return valid[default]
-        elif choice in valid:
-            return valid[choice]
-        else:
-            print("Please respond with 'yes' or 'no' "
-                  "(or 'y' or 'n').\n")
-
-
-def getCoefficients():
-    question = 'Do you want to use the default parameters?'
-    isDefault = queryYesNo(question, "yes")
-    if (isDefault):
-        Coeff = coefficients(1e-6, 0, 1, 2, 2, 1, 1)
-    else:
-        Coeff = coefficients.fromInput()
-    return Coeff
 
 
 def menu():
@@ -48,7 +14,7 @@ def menu():
 
 
 def hdgSolve():
-    hdgCoeff = getCoefficients()
+    hdgCoeff = setDefaultCoefficients()
     print("Solving...")
     hdgSolution = hdpg1d(hdgCoeff)
     # solve the problem adaptively and plot convergence history
@@ -58,9 +24,9 @@ def hdgSolve():
 
 
 def runInteractive():
-    menu()
-    selection = input("Please Select: ")
     while True:
+        menu()
+        selection = input("Please Select: ")
         if selection == '1':
             hdgSolve()
             break
@@ -70,5 +36,5 @@ def runInteractive():
             print("Bye.")
             break
         else:
-            print("Unknown Option Selected!")
+            print("Unknown Option Selected!\n")
             continue
