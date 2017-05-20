@@ -6,14 +6,17 @@ import numpy as np
 from collections import namedtuple
 from scipy.linalg import block_diag
 
-for loc in os.curdir, os.path.expanduser("~"), "/etc/hdpg1d":
+# load the configuration file
+installDir = os.path.split(__file__)[0]
+cfgPath = os.path.join(installDir, "config")
+for loc in os.curdir, os.path.expanduser("~"), cfgPath:
     try:
         with open(os.path.join(loc, "config.json")) as source:
             configdata = json.load(source)
     except IOError:
         pass
 
-# supported operators
+# evaluate the input json function with only these math operators
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
@@ -94,6 +97,7 @@ def forcing(x):
     f = np.zeros(len(x))
     for i, forcingItem in enumerate(x):
         forcingExpr = configdata["forcing"]
+        # replace the 'x' in the json file with the function parameters
         f[i] = eval_expr(forcingExpr.replace("x", str(forcingItem)))
     return f
 

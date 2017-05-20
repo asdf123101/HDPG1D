@@ -9,7 +9,6 @@
 		"tauMinus": 1
 	},
 	"forcing": "x",
-	"flux": "x",
 	"boundary": {
 		"left": 0,
 		"right": 0
