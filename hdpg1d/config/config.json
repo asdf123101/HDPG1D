@@ -8,7 +8,7 @@
 		"tauPlus": 1,
 		"tauMinus": 1
 	},
-	"forcing": "x",
+	"forcing": "1",
 	"boundary": {
 		"left": 0,
 		"right": 0
