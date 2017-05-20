@@ -9,7 +9,7 @@ from scipy.linalg import block_diag
 # load the configuration file
 installDir = os.path.split(__file__)[0]
 cfgPath = os.path.join(installDir, "config")
-for loc in os.curdir, os.path.expanduser("~"), cfgPath:
+for loc in cfgPath, os.curdir, os.path.expanduser("~"):
     try:
         with open(os.path.join(loc, "config.json")) as source:
             configdata = json.load(source)
