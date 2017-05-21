@@ -39,12 +39,12 @@ By default, the solver seeks to adapt the mesh based on the right boundary flux.
 ## Problem setup
 `PGsolve` provides two methods to setup the problem:
 * Command line interface: when `PGsolve` is called from command line, it offers the option to setup the problem manually instead of the default parameters. The parameters could be changed in command line are
-	- convection coefficient $c_1$
-	- diffusion coefficient $c_2$
-	- reaction coefficient $c_3$
+	- convection coefficient $`c_1`$
+	- diffusion coefficient $`c_2`$
+	- reaction coefficient $`c_3`$
 	- order of polynomial basis functions
 	- initial number of elements
-	- stablization parameters $\tau^+$ and $\tau^-$
+	- stablization parameters $`\tau^+`$ and $`\tau^-`$
 * Configuration file: [config.json](config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
 
 ## To-do
