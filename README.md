@@ -13,7 +13,7 @@ The main task of this project is to build an automated CFD framework based on HP
 ```math
 c_1\frac{\partial u}{\partial x} + c_2\frac{\partial^2 u}{\partial x^2} + c_3u = f,
 ```
-where $c_1$, $c_2, and $c_3$ are constants and $f$ is the forcing term.
+where $`c_1`$, $`c_2`$, and $`c_3`$ are constants and $f$ is the forcing term.
 
 ## Install
 In the souce directory: 
