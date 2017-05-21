@@ -8,9 +8,9 @@ from hdpg1d.adaptation import hdpg1d
 
 
 testData = [
-    ([1e-4, 0, 1, 2, 2, 1, 1], 1e-2),  # diffusion reaction
-    ([0, 1, 0, 2, 2, 1, 1], 0),        # convection
-    # ([1, 1, 0, 2, 2, 1, 1], 1)         # diffusion convection)
+    ([1e-4, 0, 1, 2, 2, 1, 1, 1e-10, 50], 1e-2),  # diffusion reaction
+    ([0, 1, 0, 2, 2, 1, 1, 1e-10, 50], 0),        # convection
+    # ([1, 1, 0, 2, 2, 1, 1,1e-10,50], 1)         # diffusion convection)
 ]
 
 
@@ -22,7 +22,7 @@ class TestClass(object):
         yield coeffTest, expected  # teardown
 
     def test_zeroDivision(self, monkeypatch):
-        coeffTest = coeff(*([0] * 7))
+        coeffTest = coeff(*([0] * 9))
         assert coeffTest.DIFFUSION != 0
 
     def test_solveAdaptive(self, coeffGen):
