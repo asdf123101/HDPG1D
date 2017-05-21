@@ -169,10 +169,10 @@ class hdpg1d(object):
         return np.abs(np.sum(residual)), refineIndex
 
     def adaptive(self):
-        TOL = 1e-10
+        TOL = self.coeff.TOL
         estError = 10
         nodeCount = 0
-        maxCount = 40
+        maxCount = self.coeff.MAXIT
         while estError > TOL and nodeCount < maxCount:
             # solve
             self.solvePrimal()

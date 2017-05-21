@@ -6,7 +6,8 @@ import numpy as np
 from collections import namedtuple
 from scipy.linalg import block_diag
 
-# load the configuration file
+
+# load cfg file
 installDir = os.path.split(__file__)[0]
 cfgPath = os.path.join(installDir, "config")
 for loc in cfgPath, os.curdir, os.path.expanduser("~"):
@@ -74,9 +75,11 @@ def setDefaultCoefficients():
         numEleDefault = configdata["coefficients"]["numEle"]
         tauPlusDefault = configdata["coefficients"]["tauPlus"]
         tauMinusDefault = configdata["coefficients"]["tauMinus"]
+        tol = configdata["coefficients"]["tol"]
+        maxIt = configdata["coefficients"]["maxIt"]
         coeff = coefficients(diffDefault, convDefault, reactionDefault,
-                             pOrderDefault, numEleDefault,
-                             tauPlusDefault, tauMinusDefault)
+                             pOrderDefault, numEleDefault, tauPlusDefault,
+                             tauMinusDefault, tol, maxIt)
     else:
         coeff = coefficients.fromInput()
     return coeff
@@ -115,7 +118,8 @@ def boundaryCondition(case):
 
 
 class coefficients:
-    def __init__(self, diff, conv, reaction, pOrder, numEle, tauPlus, tauMinus):
+    def __init__(self, diff, conv, reaction, pOrder, numEle,
+                 tauPlus, tauMinus, tol, maxIt):
         if diff == 0:
             # set the diffusion constant to a small number
             # to avoid division by zero error
@@ -127,6 +131,8 @@ class coefficients:
         self.numEle = numEle
         self.TAUPLUS = tauPlus
         self.TAUMINUS = tauMinus
+        self.TOL = tol
+        self.MAXIT = maxIt
 
     @classmethod
     def fromInput(cls):
@@ -141,13 +147,16 @@ class coefficients:
                 tauPlus = float(input("Stablization parameter plus (float): "))
                 tauMinus = float(
                     input("Stablization parameter minus (float): "))
+                tol = float(input("Error tolerance (float): "))
+                maxIt = int(input("Max adaptive iterations (int): "))
             except ValueError:
                 print("Sorry, wrong data type.")
                 continue
             else:
                 print("Something is wrong. Exit.")
                 break
-        return cls(diff, conv, reaction, pOrder, numEle, tauPlus, tauMinus)
+        return cls(diff, conv, reaction, pOrder, numEle,
+                   tauPlus, tauMinus, tol, maxIt)
 
 
 class discretization(object):
