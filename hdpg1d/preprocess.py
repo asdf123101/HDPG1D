@@ -1,6 +1,88 @@
+import os
+import json
+import ast
+import operator as op
 import numpy as np
 from collections import namedtuple
 from scipy.linalg import block_diag
+
+
+# load cfg file
+installDir = os.path.split(__file__)[0]
+cfgPath = os.path.join(installDir, "config")
+for loc in cfgPath, os.curdir, os.path.expanduser("~"):
+    try:
+        with open(os.path.join(loc, "config.json")) as source:
+            configdata = json.load(source)
+    except IOError:
+        pass
+
+# evaluate the input json function with only these math operators
+operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
+             ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
+             ast.USub: op.neg}
+
+
+def eval_expr(expr):
+    return eval_(ast.parse(expr, mode='eval').body)
+
+
+def eval_(node):
+    if isinstance(node, ast.Num):  # <number>
+        return node.n
+    elif isinstance(node, "x"):
+        return node.n
+    elif isinstance(node, ast.BinOp):  # <left> <operator> <right>
+        return operators[type(node.op)](eval_(node.left), eval_(node.right))
+    elif isinstance(node, ast.UnaryOp):  # <operator> <operand> e.g., -1
+        return operators[type(node.op)](eval_(node.operand))
+    else:
+        raise TypeError(node)
+
+
+def queryYesNo(question, default="yes"):
+    valid = {"yes": True, "y": True, "ye": True,
+             "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        print(question + prompt, end='')
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            print("Please respond with 'yes' or 'no' "
+                  "(or 'y' or 'n').\n")
+
+
+def setDefaultCoefficients():
+    question = "Do you want to use the default parameters?"
+    isDefault = queryYesNo(question, "yes")
+    if (isDefault):
+        diffDefault = configdata["coefficients"]["diffusion"]
+        convDefault = configdata["coefficients"]["convection"]
+        reactionDefault = configdata["coefficients"]["reaction"]
+        pOrderDefault = configdata["coefficients"]["pOrder"]
+        numEleDefault = configdata["coefficients"]["numEle"]
+        tauPlusDefault = configdata["coefficients"]["tauPlus"]
+        tauMinusDefault = configdata["coefficients"]["tauMinus"]
+        tol = configdata["coefficients"]["tol"]
+        maxIt = configdata["coefficients"]["maxIt"]
+        coeff = coefficients(diffDefault, convDefault, reactionDefault,
+                             pOrderDefault, numEleDefault, tauPlusDefault,
+                             tauMinusDefault, tol, maxIt)
+    else:
+        coeff = coefficients.fromInput()
+    return coeff
 
 
 def shape(x, p):
@@ -15,18 +97,66 @@ def shape(x, p):
 
 
 def forcing(x):
-    f = 1
+    f = np.zeros(len(x))
+    for i, forcingItem in enumerate(x):
+        forcingExpr = configdata["forcing"]
+        # replace the 'x' in the json file with the function parameters
+        f[i] = eval_expr(forcingExpr.replace("x", str(forcingItem)))
     return f
 
 
 def boundaryCondition(case):
-    if case == 0:
+    if case == 'primal':
         # primal problem
-        bc = [0, 0]
-    if case == 1:
+        bcLeft = configdata["boundary"]["left"]
+        bcRight = configdata["boundary"]["right"]
+        bc = [bcLeft, bcRight]
+    if case == 'adjoint':
         # adjoint problem
         bc = [0, 1]
     return bc
+
+
+class coefficients:
+    def __init__(self, diff, conv, reaction, pOrder, numEle,
+                 tauPlus, tauMinus, tol, maxIt):
+        if diff == 0:
+            # set the diffusion constant to a small number
+            # to avoid division by zero error
+            diff = 1e-16
+        self.DIFFUSION = diff
+        self.CONVECTION = conv
+        self.REACTION = reaction
+        self.pOrder = pOrder
+        self.numEle = numEle
+        self.TAUPLUS = tauPlus
+        self.TAUMINUS = tauMinus
+        self.TOL = tol
+        self.MAXIT = maxIt
+
+    @classmethod
+    def fromInput(cls):
+        while True:
+            try:
+                print("Please provide the following coefficients.")
+                diff = float(input("Diffusion constant (float): "))
+                conv = float(input("Covection constant (float): "))
+                reaction = float(input("Reaction constant (float): "))
+                pOrder = int(input("Order of polynomials (int): "))
+                numEle = int(input("Number of elements (int): "))
+                tauPlus = float(input("Stablization parameter plus (float): "))
+                tauMinus = float(
+                    input("Stablization parameter minus (float): "))
+                tol = float(input("Error tolerance (float): "))
+                maxIt = int(input("Max adaptive iterations (int): "))
+            except ValueError:
+                print("Sorry, wrong data type.")
+                continue
+            else:
+                print("Something is wrong. Exit.")
+                break
+        return cls(diff, conv, reaction, pOrder, numEle,
+                   tauPlus, tauMinus, tol, maxIt)
 
 
 class discretization(object):
@@ -89,14 +219,14 @@ class discretization(object):
                                             1 / 2 * (1 + self.xi) *
                                             self.dist[i - 1]))
             F[(i - 1) * numBasisFuncs:i * numBasisFuncs] = f
-        F[0] += (self.conv + self.tau_pos) * boundaryCondition(0)[0]
-        F[-1] += (-self.conv + self.tau_neg) * boundaryCondition(0)[1]
+        F[0] += (self.conv + self.tau_pos) * boundaryCondition('primal')[0]
+        F[-1] += (-self.conv + self.tau_neg) * boundaryCondition('primal')[1]
         # L, easy in 1d
         L = np.zeros(self.numEle - 1)
         # R, easy in 1d
         R = np.zeros(numBasisFuncs * self.numEle)
-        R[0] = boundaryCondition(0)[0]
-        R[-1] = -boundaryCondition(0)[1]
+        R[0] = boundaryCondition('primal')[0]
+        R[-1] = -boundaryCondition('primal')[1]
         lhsMat = namedtuple('lhsMat', ['F', 'L', 'R'])
         return lhsMat(F, L, R)
 

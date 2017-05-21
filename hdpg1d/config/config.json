@@ -1,0 +1,18 @@
+{
+	"coefficients": {
+		"diffusion": 1e-6,
+		"convection": 0,
+		"reaction": 1,
+		"pOrder": 2,
+		"numEle": 2,
+		"tauPlus": 1,
+		"tauMinus": 1,
+        "tol": 1e-10,
+        "maxIt": 30
+	},
+	"forcing": "1",
+	"boundary": {
+		"left": 0,
+		"right": 0
+	}
+}

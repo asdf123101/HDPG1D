@@ -1,0 +1,4 @@
+include hdpg1d/config/config.json
+include LICENSE
+include README.md
+include requirements.txt

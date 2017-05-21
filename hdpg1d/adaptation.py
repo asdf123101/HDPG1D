@@ -1,5 +1,7 @@
 import numpy as np
 from numpy import concatenate as cat
+from scipy.sparse import csr_matrix
+import scipy.sparse.linalg as spla
 from copy import copy
 import matplotlib.pyplot as plt
 import warnings
@@ -69,7 +71,7 @@ class hdpg1d(object):
                           self.mesh[index[i] - 1]) / 2
         self.mesh = np.sort(np.insert(self.mesh, 0, inValue))
 
-    def solveLocal(self):
+    def solvePrimal(self):
         """Solve the primal problem"""
         if 'matLocal' in locals():
             # if matLocal exists,
@@ -83,14 +85,22 @@ class hdpg1d(object):
         K = -cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))
                  .dot(cat((C, E)))) + H
+        sK = csr_matrix(K)
         F_hat = np.array([L]).T - cat((C.T, G), axis=1)\
             .dot(np.linalg.inv(np.bmat([[A, -B], [B.T, D]])))\
             .dot(np.array([cat((R, F))]).T)
-        stateFace = np.linalg.solve(K, F_hat)
-        gradState = np.linalg.inv(np.bmat([[A, -B], [B.T, D]]))\
-            .dot(np.array([np.concatenate((R, F))]).T -
-                 cat((C, E)).dot(stateFace))
-        self.primalSoln = cat((gradState.A1, stateFace.A1))
+
+        def invRHS(vec):
+            """Construct preconditioner"""
+            matVec = spla.spsolve(sK, vec)
+            return matVec
+        n = len(F_hat)
+        preconditioner = spla.LinearOperator((n, n), invRHS)
+        stateFace = spla.gmres(sK, F_hat, M=preconditioner)[0]
+        # stateFace = np.linalg.solve(K, F_hat)
+        gradState = np.linalg.inv(np.asarray(np.bmat([[A, -B], [B.T, D]]))).dot(
+            cat((R, F)) - cat((C, E)).dot(stateFace))
+        self.primalSoln = cat((gradState, stateFace))
 
     def solveAdjoint(self):
         """Solve the adjoint problem"""
@@ -105,13 +115,23 @@ class hdpg1d(object):
         A, B, _, C, D, E, F, G, H, L, R = matGroup
         # add adjoint LHS conditions
         F = np.zeros(len(F))
-        R[-1] = -boundaryCondition(1)[1]
+        R[-1] = -boundaryCondition('adjoint')[1]
         # assemble global matrix LHS
         LHS = np.bmat([[A, -B, C],
                        [B.T, D, E],
                        [C.T, G, H]])
-        # solve in one shoot
-        soln = np.linalg.solve(LHS.T, cat((R, F, L)))
+        sLHS = csr_matrix(LHS)
+        RHS = cat((R, F, L))
+
+        # solve in one shoot using GMRES
+        def invRHS(vec):
+            """Construct preconditioner"""
+            matVec = spla.spsolve(sLHS, vec)
+            return matVec
+        n = len(RHS)
+        preconditioner = spla.LinearOperator((n, n), invRHS)
+        soln = spla.gmres(sLHS, RHS, M=preconditioner)[0]
+        # soln = np.linalg.solve(LHS.T, RHS)
         self.adjointSoln = soln
 
     def DWResidual(self):
@@ -149,13 +169,13 @@ class hdpg1d(object):
         return np.abs(np.sum(residual)), refineIndex
 
     def adaptive(self):
-        TOL = 1e-10
+        TOL = self.coeff.TOL
         estError = 10
         nodeCount = 0
-        maxCount = 30
+        maxCount = self.coeff.MAXIT
         while estError > TOL and nodeCount < maxCount:
             # solve
-            self.solveLocal()
+            self.solvePrimal()
             self.solveAdjoint()
             # plot the solution at certain counter
             if nodeCount in [0, 4, 9, 19, maxCount]:
@@ -173,12 +193,10 @@ class hdpg1d(object):
             self.meshAdapt(index)
             self.numEle = self.numEle + len(index)
             nodeCount += 1
-            print("Iteration {}. Target function error {:.3e}.".format(
-                nodeCount, estError))
+            print("Iteration {}. Estimated target function error {:.3e}."
+                  .format(nodeCount, estError))
             if nodeCount == maxCount:
                 print("Max iteration number is reached "
                       "while the convergence criterion is not satisfied.\n"
                       "Check the problem statement or "
                       "raise the max iteration number, then try again.\n")
-                from .solve import runInteractive
-                runInteractive()
