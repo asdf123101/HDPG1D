@@ -28,10 +28,10 @@ In terminal, call:
 ```bash
 PGsolve
 ```
-Follow the prompts to setup the problem, visualize the solution, and check the convergence.
+Follow the prompts to setup the problem, visualize the solution, and check the convergence plot.
 
 ### Convergence plot
-The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error may not be accurate after certain threshold.
+The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error, may not be accurate after certain error threshold.
 
 ### Adaptive method
 By default, the solver seeks to adapt the mesh based on the right boundary flux. The solver stops after the estimated error is lower than a user defined tolerance or reaches maximum iteration number.
@@ -45,7 +45,7 @@ By default, the solver seeks to adapt the mesh based on the right boundary flux.
 	- order of polynomial basis functions
 	- initial number of elements
 	- stablization parameters $`\tau^+`$ and $`\tau^-`$
-* Configuration file: [config.json](config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
+* Configuration file: [config.json](hdpg1d/config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
 
 ## To-do
 * Support non-linear problems
