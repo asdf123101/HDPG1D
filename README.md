@@ -28,7 +28,11 @@ In terminal, call:
 ```bash
 PGsolve
 ```
+<<<<<<< HEAD
 Follow the prompts to setup the problem, visualize the solution, and finally check the convergence.
+=======
+Follow the prompts to setup the problem, visualize the solution, and check the convergence plot.
+>>>>>>> v3.0.1-hotfix
 
 ### Convergence plot
 The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error, may not be accurate after certain error threshold.
