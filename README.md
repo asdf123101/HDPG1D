@@ -9,7 +9,7 @@ Notice that the oscillations near the shock are well controlled even without any
 <img align="centre" img src="http://i.imgur.com/HrWIi4s.png" width="50%" height="50%" title="source: imgur.com" />
 </p>
 
-The main task of this project is to build an automated CFD framework based on HPDG discretization and robust adaptive mesh refinement. The solver is currently capable of solving 1D linear convection-diffusion equations of the following form with Dirichlet boundary condition,
+The main task of this project is to build an automated CFD framework based on HPDG discretization and robust adaptive mesh refinement. The solver is currently capable of solving 1D linear convection-diffusion-reaction equations of the following form with Dirichlet boundary condition,
 ```math
 c_1\frac{\partial u}{\partial x} + c_2\frac{\partial^2 u}{\partial x^2} + c_3u = f,
 ```
@@ -31,21 +31,21 @@ PGsolve
 Follow the prompts to setup the problem, visualize the solution, and check the convergence.
 
 ### Convergence plot
-The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error may not be accurate after certain threshold.
+The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error, may not be accurate after certain error threshold.
 
 ### Adaptive method
 By default, the solver seeks to adapt the mesh based on the right boundary flux. The solver stops after the estimated error is lower than a user defined tolerance or reaches maximum iteration number.
 
 ## Problem setup
 `PGsolve` provides two methods to setup the problem:
-* Command line interface: when `PGsolve` is called from command line, it offers the option to setup the problem manually instead of the default parameters. The parameters could be changed in command line are
+* Command line interface: when `PGsolve` is called from command line, it offers the option to setup the problem manually instead of use the default parameters. The parameters could be changed in command line are
 	- convection coefficient $`c_1`$
 	- diffusion coefficient $`c_2`$
 	- reaction coefficient $`c_3`$
 	- order of polynomial basis functions
 	- initial number of elements
 	- stablization parameters $`\tau^+`$ and $`\tau^-`$
-* Configuration file: [config.json](config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
+* Configuration file: [config.json](hdpg1d/config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
 
 ## To-do
 * Support non-linear problems
