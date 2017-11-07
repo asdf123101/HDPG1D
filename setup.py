@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='hdpg1d',
-      version='3.0.1',
+      version='3.0.2',
       description='An 1D finite element solver using hybridizable discontinuous\
       Petrov-Galerkin method',
       author='Keyi Ni',
