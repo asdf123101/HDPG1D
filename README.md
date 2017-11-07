@@ -15,6 +15,8 @@ c_1\frac{\partial u}{\partial x} + c_2\frac{\partial^2 u}{\partial x^2} + c_3u =
 ```
 where $`c_1`$, $`c_2`$, and $`c_3`$ are constants and $`f`$ is the forcing term.
 
+This package currently only has HDG discretization as a preliminary discretization, please refer to [this paper](http://www.sciencedirect.com/science/article/pii/S0021999109000308) for implementation details.
+
 ## Install
 In the souce directory:
 ```bash
