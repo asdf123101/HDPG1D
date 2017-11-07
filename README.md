@@ -1,5 +1,5 @@
 # HDPG1D
-This is a python package that solves 1-Dimensional PDEs using hybridizable discontinuous Petrov-Galerkin discretization, a novel FEA discretization that ensures the best solution quality without extra stablization mechanism. The following image shows the solution of 1D inviscid Burger's equation using HDPG discretization. 
+This is a python package that solves 1-Dimensional PDEs using hybridizable discontinuous Petrov-Galerkin discretization, a novel FEA discretization that ensures the best solution quality without extra stablization mechanism. The following image shows the solution of 1D inviscid Burger's equation using HDPG discretization.
 ```math
 \frac{\partial u}{\partial t} + \frac{1}{2} \frac{\partial u^2}{\partial x} = 0, \quad \text{in } \Omega \in [0,1].
 ```
@@ -16,7 +16,7 @@ c_1\frac{\partial u}{\partial x} + c_2\frac{\partial^2 u}{\partial x^2} + c_3u =
 where $`c_1`$, $`c_2`$, and $`c_3`$ are constants and $`f`$ is the forcing term.
 
 ## Install
-In the souce directory: 
+In the souce directory:
 ```bash
 python setup.py sdist
 cd dist/
@@ -28,17 +28,13 @@ In terminal, call:
 ```bash
 PGsolve
 ```
-<<<<<<< HEAD
-Follow the prompts to setup the problem, visualize the solution, and finally check the convergence.
-=======
-Follow the prompts to setup the problem, visualize the solution, and check the convergence plot.
->>>>>>> v3.0.1-hotfix
+Follow the prompts to setup problem, visualize solution, and check convergence plot.
 
 ### Convergence plot
-The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and large number of elements. Therefore, the error plot, especially the adaptive solution error, may not be accurate after certain error threshold.
+The error on the convergence plot is calculated using approximated 'exact' solution with higher polynomial functions and higher number of elements. Therefore, the error plot, especially the adaptive solution error, may not be accurate after certain error threshold.
 
 ### Adaptive method
-By default, the solver seeks to adapt the mesh based on the right boundary flux. The solver stops after the estimated error is lower than a user defined tolerance or reaches maximum iteration number.
+By default, the solver seeks to adapt mesh based on the right boundary flux. The solver stops after the estimated error is lower than a user defined tolerance or reaches maximum iteration number.
 
 ## Problem setup
 `PGsolve` provides two methods to setup the problem:
@@ -49,7 +45,7 @@ By default, the solver seeks to adapt the mesh based on the right boundary flux.
 	- order of polynomial basis functions
 	- initial number of elements
 	- stablization parameters $`\tau^+`$ and $`\tau^-`$
-* Configuration file: [config.json](hdpg1d/config/config.json) is the sample configuration file comes with the application, specifying the default parameters in the command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will read the new configuration file and use the values in the file as default parameters.
+* Configuration file: [config.json](hdpg1d/config/config.json) is the sample configuration file comes with the application, specifying default parameters in command line interface. To customize parameters including forcing term and boundary condtions, create `config.json` in the current working directory or in your home directory `~/`, copy the content of the sample configuration file, and change the value of each entry according to the specific problem.  Running `PGsolve` in the currecnt working directory will then use values in the file as default parameters.
 
 ## To-do
 * Support non-linear problems
