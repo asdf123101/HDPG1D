@@ -1,4 +1,12 @@
 language: python
+
+sudo: false
+
+addons:
+    apt:
+        packages:
+            - texlive-latex-extra
+
 python:
   - "3.5"
   - "3.6"
