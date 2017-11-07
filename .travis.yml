@@ -6,6 +6,7 @@ addons:
     apt:
         packages:
             - texlive-latex-extra
+            - dvipng
 
 python:
   - "3.5"
