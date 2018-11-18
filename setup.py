@@ -19,7 +19,7 @@ setup(name='hdpg1d',
               'PGsolve = hdpg1d.cmd:main'
           ],
       },
-      requires=[
+      install_requires=[
           'numpy',
           'matplotlib',
           'scipy'
